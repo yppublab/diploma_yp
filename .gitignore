@@ -1,0 +1,129 @@
+/tasks.md
+/report.md
+/workfiles
+ldap_users.csv
+*.target
+
+/srv_idm
+
+# Editors / IDE
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# OS / misc
+.DS_Store
+Thumbs.db
+*.tmp
+~$*
+
+# Tools
+.tmp_tools/
+
+# Logs
+wget-log
+.*.log
+.xorgxrdp*.log
+
+fw/nftables.target.conf
+docker-compose-trash.yml
+srv_wazuh_manager/ossec/queue/vd/feed/*
+srv_wazuh_manager/var/ossec/logs
+home/
+.cache/
+.mozilla/
+
+# --- OS & System Files (Системный мусор) ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp
+
+# --- IDE & Editors (Настройки редакторов) ---
+.idea/
+.vscode/
+*.swp
+*.swo
+
+safeline/data/**
+
+# --- Browsers General (Общие браузерные папки) ---
+# Игнорируем любые папки .mozilla (Firefox)
+.mozilla/
+# Игнорируем папки кеша Google Chrome / Chromium
+.config/google-chrome/
+.cache/
+#*cache/
+
+!var/www/html/application/
+!var/www/html/application/**
+
+# --- Browser Automation / Selenium (Если вы используете автоматизацию) ---
+# Драйверы
+chromedriver
+geckodriver
+msedgedriver
+
+# Профили браузеров (частые названия при парсинге)
+chrome_profile/
+firefox_profile/
+browser_data/
+user_data/
+
+# Логи работы драйверов
+geckodriver.log
+chromedriver.log
+
+# --- Python (Самый частый спутник автоматизации) ---
+__pycache__/
+*.pyc
+venv/
+.venv/
+home/.config
+.config/pulse/
+**/.config/pulse/
+*.sock
+.config/xfce4/
+
+# Игнор настроек других графических оболочек (на всякий случай)
+.config/gnome/
+.config/kde/
+.config/gtk-3.0/
+
+.config/
+.gnupg/
+
+# Ключи и доступы (ОПАСНО КОММИТИТЬ!)
+.gnupg/
+.ssh/
+.pki/
+
+# Системные настройки и кеши (вызывают ошибки сокетов)
+.config/
+.cache/
+.local/
+.dbus/
+.gvfs/
+
+.bash_history
+.zsh_history
+.lesshst
+.viminfo
+.pcsc10/
+.pcsc11/
+.pcsc12/
+.pcsc13/
+users/test*
+
+**/ossec/queue/**

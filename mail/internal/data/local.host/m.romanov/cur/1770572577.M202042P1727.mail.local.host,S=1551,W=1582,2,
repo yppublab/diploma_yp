@@ -1,0 +1,31 @@
+Return-Path: <e.belova@local.host>
+Delivered-To: m.romanov@local.host
+Received: from mail.local.host
+	by mail.local.host with LMTP
+	id 44kCDCHLiGm/BgAAsV38vg
+	(envelope-from <e.belova@local.host>)
+	for <m.romanov@local.host>; Sun, 08 Feb 2026 17:42:57 +0000
+Received: from localhost (localhost [127.0.0.1])
+	by mail.local.host (Postfix) with ESMTP id 2EA062891D2
+	for <m.romanov@local.host>; Sun,  8 Feb 2026 17:42:57 +0000 (UTC)
+Received: from 172.16.100.151 (srv_roundcube.servers_net [192.168.1.51])
+	(Authenticated sender: e.belova@local.host)
+	by mail.local.host (Postfix) with ESMTPA id 109062891DF
+	for <m.romanov@local.host>; Sun,  8 Feb 2026 17:42:57 +0000 (UTC)
+MIME-Version: 1.0
+Date: Sun, 08 Feb 2026 20:42:57 +0300
+From: e.belova@local.host
+To: m.romanov@local.host
+Subject: =?UTF-8?Q?=D0=9F=D1=80=D0=BE=D1=82=D0=BE=D0=BA=D0=BE=D0=BB_?=
+ =?UTF-8?Q?=D1=81=D0=BE=D0=B2=D0=B5=D1=89=D0=B0=D0=BD=D0=B8=D1=8F_=D0=BF?=
+ =?UTF-8?Q?=D0=BE_=D0=B1=D0=B5=D0=B7=D0=BE=D0=BF=D0=B0=D1=81=D0=BD=D0=BE?=
+ =?UTF-8?Q?=D1=81=D1=82=D0=B8?=
+Message-ID: <b59d7c356e4bb5b5fd3490e56ad3afb0@local.host>
+X-Sender: e.belova@local.host
+Content-Type: text/plain; charset=UTF-8;
+ format=flowed
+Content-Transfer-Encoding: 8bit
+
+Коллеги, результаты аудита неутешительные. В сегменте 192.168.1.0/24 
+обнаружены критические уязвимости в старых версиях софта. Пока патчи не 
+накатили, просьба закрыть 22 и 445 порты на фаерволе.

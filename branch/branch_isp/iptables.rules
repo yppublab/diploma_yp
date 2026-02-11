@@ -1,0 +1,18 @@
+*nat
+:PREROUTING ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+
+# DNAT внешний->fw: весь трафик, пришедший на IP прокси на uplink
+-A PREROUTING ! -s 172.52.135.100 -j DNAT --to-destination 172.52.135.100
+
+# маскируем пакеты, которые пришли с самого докер-хоста (для остальных не требуется)
+-A POSTROUTING -s 172.52.135.1 -j SNAT --to-source 172.52.135.254
+
+COMMIT
+
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+
+COMMIT

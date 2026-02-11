@@ -1,0 +1,114 @@
+- name: Healthcheck
+  hosts: all
+  gather_facts: false
+  become: true
+
+  pre_tasks:
+    - name: ICMP ping from controller (2 attempts, 1s timeout)
+      ansible.builtin.command: "ping -c 2 -W 1 {{ inventory_hostname }}"
+      delegate_to: localhost
+      become: false
+      register: icmp_ping
+      failed_when: false
+      changed_when: false
+
+    - name: Skip host when ICMP unreachable
+      ansible.builtin.meta: end_host
+      when: icmp_ping.rc != 0
+
+    - name: Check SSH availability (port 22)
+      ansible.builtin.wait_for:
+        host: "{{ inventory_hostname }}"
+        port: 22
+        timeout: 1
+        connect_timeout: 1
+        state: started
+      delegate_to: localhost
+      become: false
+      register: ssh_check
+      failed_when: false
+      changed_when: false
+
+    - name: Skip host when SSH unavailable
+      ansible.builtin.meta: end_host
+      when: ssh_check.state is not defined or ssh_check.state != "started"
+
+    - name: Confirm pre_tasks completed
+      ansible.builtin.debug:
+        msg: "pre_tasks passed: ICMP and SSH reachable"
+      when: icmp_ping.rc == 0 and ssh_check.state is defined and ssh_check.state == "started"
+
+  tasks:
+    - name: Read passwd database
+      ansible.builtin.getent:
+        database: passwd
+
+    - name: Build missing user list
+      ansible.builtin.set_fact:
+        missing_users: >-
+          {{ ['test', 'localadmin']
+             | reject('in', ansible_facts.getent_passwd.keys())
+             | list }}
+
+    - name: Ensure required users exist
+      ansible.builtin.assert:
+        that:
+          - missing_users | length == 0
+        fail_msg: "Missing users: {{ missing_users | join(', ') }}"
+        success_msg: "Required users present: test, localadmin"
+
+    - name: Stat required files for users and branch_users
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /usr/local/share/ca-certificates/proxy_ca.crt
+        - /etc/firefox/policies/policies.json
+      register: required_file_stats
+      when: "'users' in group_names or 'branch_users' in group_names"
+
+    - name: Ensure required files exist and are regular files
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isreg
+        fail_msg: "Missing or not a file: {{ item.stat.path }}"
+        success_msg: "Required file present: {{ item.stat.path }}"
+      loop: "{{ required_file_stats.results | default([]) }}"
+      when: "'users' in group_names or 'branch_users' in group_names"
+
+    - name: Check syslog file exists
+      ansible.builtin.stat:
+        path: /var/log/syslog
+      register: syslog_stat
+
+    - name: Fail if syslog missing
+      ansible.builtin.fail:
+        msg: "/var/log/syslog not found"
+      when: not syslog_stat.stat.exists
+
+    - name: Count errors in syslog for the last hour
+      ansible.builtin.shell: |
+        set -euo pipefail
+        cutoff="$(date -d '1 hour ago' +%s)"
+        year="$(date +%Y)"
+        awk -v cutoff="$cutoff" -v year="$year" '
+          BEGIN {
+            mon["Jan"]=1; mon["Feb"]=2; mon["Mar"]=3; mon["Apr"]=4; mon["May"]=5; mon["Jun"]=6;
+            mon["Jul"]=7; mon["Aug"]=8; mon["Sep"]=9; mon["Oct"]=10; mon["Nov"]=11; mon["Dec"]=12;
+            count=0;
+          }
+          {
+            m=mon[$1]; d=$2; split($3, t, ":");
+            if (m==0 || d=="" || t[1]=="") next;
+            ts = mktime(year " " m " " d " " t[1] " " t[2] " " t[3]);
+            if (ts >= cutoff && $0 ~ /error/i) count++;
+          }
+          END { print count }' /var/log/syslog
+      args:
+        executable: /bin/bash
+      register: syslog_error_count
+      changed_when: false
+
+    - name: Show syslog error count for the last hour
+      ansible.builtin.debug:
+        msg: "Syslog errors in the last hour: {{ syslog_error_count.stdout | trim }}"

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Local Host BIM Viewer — проекты</title>
+  <style>
+    :root {
+      --bg: #e7e2da;
+      --ink: #171a1f;
+      --muted: #4a525f;
+      --accent: #f2b632;
+      --card: rgba(255, 255, 255, 0.78);
+      --line: rgba(23, 26, 31, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 16px/1.6 "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 480px at 85% -10%, rgba(65, 182, 178, 0.28), transparent 60%),
+        radial-gradient(1000px 520px at 10% 0%, rgba(242, 182, 50, 0.22), transparent 55%),
+        linear-gradient(180deg, var(--bg), #d6d0c6);
+      min-height: 100vh;
+      padding: 32px;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    h1 { margin: 0 0 10px; font-size: 30px; }
+    p { margin: 0 0 18px; color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 12px 26px rgba(23, 26, 31, 0.15);
+    }
+    .card h3 { margin: 0 0 8px; font-size: 18px; }
+    .card p { margin: 0 0 10px; font-size: 14px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      background: linear-gradient(120deg, var(--accent), #f7cc63);
+      color: #1d1f23;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      text-decoration: none;
+      background: rgba(255,255,255,0.6);
+      margin-left: 8px;
+    }
+    .status { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Local Host BIM Viewer</h1>
+    <p>Выберите проект. Ссылки ведут в xeokit Viewer с заранее выбранной моделью.</p>
+    <div id="projects" class="grid"></div>
+  </div>
+
+  <script>
+    const projectsContainer = document.getElementById("projects");
+
+    const card = (title, subtitle, href, fallbackHref) => {
+      const el = document.createElement("div");
+      el.className = "card";
+      el.innerHTML = `
+        <h3>${title}</h3>
+        <p>${subtitle || "Модель будет открыта в Viewer."}</p>
+        <a class="btn" href="${href}">Открыть модель</a>
+        ${fallbackHref ? `<a class="ghost" href="${fallbackHref}">Открыть проект</a>` : ""}
+      `;
+      return el;
+    };
+
+    const loadProjects = async () => {
+      const resp = await fetch("./app/data/projects/index.json", { cache: "no-store" });
+      const data = await resp.json();
+      const projects = data.projects || [];
+
+      for (const project of projects) {
+        let modelId = "";
+        try {
+          const projResp = await fetch(`./app/data/projects/${project.id}/index.json`, { cache: "no-store" });
+          const projData = await projResp.json();
+          modelId = projData.models && projData.models.length ? projData.models[0].id : "";
+        } catch {
+          modelId = "";
+        }
+
+        const projectLink = `./app/index.html?projectId=${encodeURIComponent(project.id)}&openExplorer=true`;
+        const modelLink = modelId
+          ? `./app/index.html?projectId=${encodeURIComponent(project.id)}&modelId=${encodeURIComponent(modelId)}&openExplorer=true`
+          : projectLink;
+
+        projectsContainer.appendChild(
+          card(project.name || project.id, modelId ? `Модель: ${modelId}` : "Модель не выбрана", modelLink, projectLink)
+        );
+      }
+
+      if (!projects.length) {
+        projectsContainer.appendChild(
+          card("Проекты не найдены", "Проверьте наличие app/data/projects/index.json.", "./app/index.html", "")
+        );
+      }
+    };
+
+    loadProjects().catch((err) => {
+      projectsContainer.appendChild(
+        card("Ошибка загрузки", "Не удалось получить список проектов.", "./app/index.html", "")
+      );
+      console.error(err);
+    });
+  </script>
+</body>
+</html>

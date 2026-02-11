@@ -1,0 +1,54 @@
+<!-- https://github.com/socfortress/Wazuh-Rules -->
+
+<!-- Local rules -->
+
+<!-- Modify it at your will. -->
+<!-- Copyright (C) 2015, Wazuh Inc. -->
+
+<!-- Example -->
+<group name="local,syslog,sshd,">
+
+  <!--
+  Dec 10 01:02:02 host sshd[1234]: Failed none for root from 1.1.1.1 port 1066 ssh2
+  -->
+  <rule id="100001" level="5">
+    <if_sid>5716</if_sid>
+    <srcip>1.1.1.1</srcip>
+    <description>sshd: authentication failed from IP 1.1.1.1.</description>
+    <group>authentication_failed,pci_dss_10.2.4,pci_dss_10.2.5,</group>
+  </rule>
+
+</group>
+
+<group name="local,syslog,">
+  <rule id="100500" level="12">
+    <if_sid>5902</if_sid>
+    <regex>UID=0|uid=0</regex>
+    <description>CRITICAL: User created with ROOT privileges (UID 0)</description>
+    <group>pci_dss_8.1.2,gdpr_IV_35.7.d,</group>
+  </rule>
+</group>
+
+<group name="local,syslog,">
+  <rule id="100100" level="12">
+    <match>WAZUH_TEST</match>
+    <description>Syslog test message (WAZUH_TEST)</description>
+  </rule>
+</group>
+
+<group name="openldap,syslog,access_control,">
+  <rule id="100501" level="15" frequency="3" timeframe="60">
+    <if_matched_sid>2509</if_matched_sid>
+    <same_srcip/>
+    <description>3 неуспешные попытки аутентификации LDAP за 60 сек</description>
+  </rule>
+</group>
+
+<group name="Modsecurity">
+<rule id="100099" level="12" frequency="5" timeframe="600">
+        <if_matched_sid>30411</if_matched_sid>
+        <same_srcip />
+        <description>Same IP Triggering Modsecurity Block 5 times within 10 minutes.</description>
+        <group>bruteforce,</group>
+    </rule>
+</group>

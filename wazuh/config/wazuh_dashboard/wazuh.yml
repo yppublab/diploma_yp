@@ -1,0 +1,9 @@
+hosts:
+  - 1513629884013:
+      url: "https://srv_wazuh_manager"
+      port: 55000
+      username: wazuh-wui
+      password: "MyS3cr37P450r.*-"
+      run_as: false
+customization.logo.app: "custom/images/customization.logo.app.jpg?v=1765372320253"
+customization.logo.reports: "custom/images/customization.logo.reports.jpg"

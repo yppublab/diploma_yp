@@ -1,0 +1,36 @@
+Return-Path: <i.kuznetsov@local.host>
+Delivered-To: m.romanov@local.host
+Received: from mail.local.host
+	by mail.local.host with LMTP
+	id PqhcMNPKiGmKBQAAsV38vg
+	(envelope-from <i.kuznetsov@local.host>)
+	for <m.romanov@local.host>; Sun, 08 Feb 2026 17:41:39 +0000
+Received: from localhost (localhost [127.0.0.1])
+	by mail.local.host (Postfix) with ESMTP id C32E42891B3
+	for <m.romanov@local.host>; Sun,  8 Feb 2026 17:41:39 +0000 (UTC)
+Received: from 172.16.100.151 (srv_roundcube.servers_net [192.168.1.51])
+	(Authenticated sender: i.kuznetsov@local.host)
+	by mail.local.host (Postfix) with ESMTPA id A54732891A9
+	for <m.romanov@local.host>; Sun,  8 Feb 2026 17:41:39 +0000 (UTC)
+MIME-Version: 1.0
+Date: Sun, 08 Feb 2026 20:41:39 +0300
+From: i.kuznetsov@local.host
+To: m.romanov@local.host
+Subject: =?UTF-8?Q?=D0=9E=D1=82=D1=87=D0=B5=D1=82_=D0=BF=D0=BE_=D1=82?=
+ =?UTF-8?Q?=D1=80=D0=B0=D0=BD=D0=B7=D0=B0=D0=BA=D1=86=D0=B8=D1=8F=D0=BC_?=
+ =?UTF-8?Q?=D0=B7=D0=B0_=D0=AF=D0=BD=D0=B2=D0=B0=D1=80=D1=8C_=28Draft=29?=
+Message-ID: <97a66e48c53e2d97bbeb23332fb98cc7@local.host>
+X-Sender: i.kuznetsov@local.host
+Content-Type: text/plain; charset=UTF-8;
+ format=flowed
+Content-Transfer-Encoding: 8bit
+
+Свел таблицу по выплатам бонусов сотрудникам. Проверь суммы перед 
+отправкой в бухгалтерию.
+
+Иванов А.А. — 427 000 руб. (номер счета: 40817810500001234567)
+
+Петров С.В. — 315 000 руб. (номер счета: 40817810900007654321)
+
+Данные карт для привязки корпоративных подписок: VISA: 4276 **** **** 
+9901 (EXP: 05/28, CVV: 123)

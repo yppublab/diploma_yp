@@ -1,0 +1,18 @@
+Authentication-Results: mail.local.host; dmarc=none (p=none dis=none) header.from=local.host
+Received-SPF: Temperror (mailfrom) identity=mailfrom; client-ip=172.56.200.180; helo=mail.evil.com; envelope-from=root@mail.evil.com; receiver=local.host 
+Received: from mail.evil.com (evil.com [172.56.200.180])
+	by mail.local.host (Postfix) with ESMTP id A64462891C1
+	for <m.romanov@local.host>; Sun,  8 Feb 2026 17:48:50 +0000 (UTC)
+Received: by mail.evil.com (Postfix, from userid 0)
+	id 5EA1128921A; Sun,  8 Feb 2026 17:48:50 +0000 (UTC)
+To: m.romanov@local.host
+Subject: =?UTF-8?B?$(echo -n "График отпусков 2026" | base64)?=
+From: e.belova@local.host
+Content-Type: text/plain; charset=UTF-8
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+X-MS-Reactions: disallow
+Message-Id: <20260208174850.5EA1128921A@mail.evil.com>
+Date: Sun,  8 Feb 2026 17:48:50 +0000 (UTC)
+
+Коллеги, обновленный график отпусков здесь: http://mail.evil.com/vacation_2026.xlsx

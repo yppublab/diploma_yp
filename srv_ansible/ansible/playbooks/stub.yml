@@ -1,0 +1,5 @@
+---
+- name: Stub playbook (no-op)
+  hosts: all
+  gather_facts: false
+  tasks: []

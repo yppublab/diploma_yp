@@ -1,0 +1,4 @@
+dn: ou=Users,dc=local,dc=host
+changetype: modify
+replace: pwdPolicySubentry
+pwdPolicySubentry: cn=pwdPolicyUsers,ou=Policies,dc=local,dc=host

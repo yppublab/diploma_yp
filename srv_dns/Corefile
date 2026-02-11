@@ -1,0 +1,15 @@
+.:53 {
+  log
+  errors
+  # Rewrite short names like "srv_dns" -> "srv_dns.local.host"
+  rewrite stop {
+    name regex ^([^.]+)\.?$ {1}.local.host.
+    answer auto
+  }
+  # Serve local zone
+  file /etc/coredns/local.host.db local.host 
+  # Cache responses briefly
+  cache 30
+  # Forward all other queries to public resolvers
+  forward . /etc/resolv.conf
+}

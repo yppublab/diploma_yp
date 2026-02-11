@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internal API Service</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #2d3436;
+        }
+        .container {
+            background: white;
+            padding: 3rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 600px;
+        }
+        h1 {
+            color: #0984e3;
+            margin-bottom: 1.5rem;
+            font-size: 2.2rem;
+        }
+        p {
+            line-height: 1.6;
+            font-size: 1.1rem;
+            color: #636e72;
+        }
+        .status {
+            display: inline-block;
+            margin-top: 2rem;
+            padding: 0.5rem 1rem;
+            background: #55efc4;
+            color: #00b894;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        .footer {
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            color: #b2bec3;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Добро пожаловать на внутренний API сервис работы с клиентами</h1>
+        
+        <p>Данный узел предназначен исключительно для внутреннего использования. Система обеспечивает высокоскоростной доступ к базе данных клиентов, обработку транзакций и синхронизацию статусов в реальном времени.</p>
+        
+        <p>Для интеграции используйте стандартную документацию REST протокола. Все запросы логируются и проходят через шлюз безопасности.</p>
+
+        <div class="status">● Система активна (Порт 8080)</div>
+
+        <div class="footer">
+            © 2024 IT Department Internal Tools
+        </div>
+    </div>
+<!--
+Привет коллега разраб, от инженера тепловых коммуникаций!
+Оказывается делать сайты проще чем трубы варить, еще за это и платят хорошо. 
+Короче, я тут что-то натыкал, вроде пашет. Какая-то штуковина, куда можно тыкать буквы, лежит вот тут:
+/api.php. Мне сказали умные люди, что если туда какие то кавычки вводить с единицами, типа ' '1'='1, то всё ломается. Ничего подобного! у меня ничего не сломалось, передняя страничка все фильтрует!
+Ну и во-первых это все для внутреннего использования, а во-вторых бизнес сказал что надо настроить сайт быстро, ну я и настроил.
+Чтобы пустило, проверяет секретное слово с тем, что написано в блокнотике secret.txt в папке tmp.
+-->
+</body>
+</html>

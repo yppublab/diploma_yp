@@ -1,0 +1,57 @@
+$ORIGIN local.host.
+$TTL 300
+@   IN SOA ns.local.host. admin.local.host. (
+        2025091003 ; Serial
+        3600       ; Refresh
+        900        ; Retry
+        604800     ; Expire
+        300 )      ; Minimum
+
+; NS
+@                       IN NS ns.local.host.
+
+; APEX and hosts
+
+@                       IN A    192.168.204.34
+branch_fw	        IN A	10.97.23.254
+branch_fw	        IN A	10.97.24.254
+branch_fw	        IN A	10.97.25.254
+branch_fw	        IN A	10.97.26.254
+branch_fw	        IN A	172.52.135.100
+branch_isp	        IN A	172.52.135.254
+fw      	        IN A	172.56.200.100
+fw      	        IN A	192.168.201.254
+fw      	        IN A	192.168.202.254
+fw      	        IN A	192.168.203.254
+fw      	        IN A	192.168.204.254
+fw      	        IN A	192.168.205.254
+fw      	        IN A	192.168.206.254
+ns      	        IN A	192.168.201.24
+srv_ansible	        IN A	192.168.205.77
+srv_arkime	        IN A	192.168.203.53
+srv_bastion	        IN A	192.168.205.66
+srv_bastion_ib	        IN A	192.168.203.66
+srv_dns	                IN A	192.168.201.24
+srv_ntp                 IN A    192.168.201.123
+srv_espocrm	        IN A	192.168.201.215
+crm                     IN A	192.168.201.215
+srv_espocrm_db  	IN A	192.168.201.216
+srv_fs                  IN A    192.168.201.33
+srv_ldap	        IN A	192.168.201.199
+srv_ldap_mgr            IN A    192.168.205.199
+srv_opensearch	        IN A	192.168.203.55
+srv_polarproxy	        IN A	192.168.204.204
+srv_wazuh_dashboard	IN A	192.168.203.90
+srv_wazuh_indexer	IN A	192.168.203.89
+srv_wazuh_manager	IN A	192.168.203.88
+srv_wg_portal	        IN A	192.168.204.200
+srv_wiki	        IN A	192.168.201.120
+srv_web                 IN A    192.168.204.34
+api                     IN A    192.168.204.34
+srv_web_db              IN A    192.168.204.94
+wazuh                   IN A    192.168.203.90
+srv_branch_bastion	IN A	10.97.22.66
+srv_branch_dns	        IN A	10.97.22.44
+srv_branch_fs	        IN A	10.97.22.33
+srv_branch_polarproxy	IN A	10.97.22.50
+srv_branch_wg_gate	IN A	10.97.22.200
