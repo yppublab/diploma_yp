@@ -707,6 +707,7 @@ services:
       - apparmor:unconfined
     volumes:
       - ./ws_msk_000242/home/:/home/
+      - ./ws_msk_000242/export_ldap_groups.py:/home/student/export_ldap_groups.py
       - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf
       - ./ws_msk_000242/etc/ws_msk_login.defs:/etc/login.defs:rw
       - ./ws_msk_000242/etc/ws_msk_pwquality.conf:/etc/security/pwquality.conf:rw
