@@ -59,7 +59,13 @@ mkdir -p /etc/sssd
 cp /etc/sssd_temp.conf /etc/sssd/sssd.conf
 chmod 600 /etc/sssd/sssd.conf
 mkdir -p /var/lib/sss/db /var/log/sssd
-/usr/sbin/sssd
+if [ -f /run/sssd.pid ]; then
+  pid="$(cat /run/sssd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sssd; then
+    rm -f /run/sssd.pid /var/run/sssd.pid
+  fi
+fi
+pgrep -x sssd >/dev/null 2>&1 || /usr/sbin/sssd
 echo "Testing LDAP connection via SSSD..."
 if getent passwd test >/dev/null 2>&1; then
   echo "LDAP connection OK, NSS cache warmed."
@@ -68,7 +74,16 @@ else
 fi
 
 # Запуск rsyslog
-/usr/sbin/rsyslogd
+if [ -f /run/rsyslogd.pid ]; then
+  pid="$(cat /run/rsyslogd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx rsyslogd; then
+    rm -f /run/rsyslogd.pid
+  fi
+fi
+
+pgrep -x rsyslogd >/dev/null 2>&1 || /usr/sbin/rsyslogd -iNONE
+
+
 
 # Права на домашние директории: владелец по имени каталога, права 0755
 # Нужно если подключалось через volumes и права не сохранились при загрузке с гита
@@ -84,7 +99,13 @@ done
 # Run SSH server
 mkdir -p /run/sshd
 chmod 755 /run/sshd
-/usr/sbin/sshd
+if [ -f /run/sshd.pid ]; then
+  pid="$(cat /run/sshd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sshd; then
+    rm -f /run/sshd.pid /var/run/sshd.pid
+  fi
+fi
+pgrep -x sshd >/dev/null 2>&1 || /usr/sbin/sshd
 
 # WAZUH AGENT START
 /var/ossec/bin/wazuh-control start
@@ -92,7 +113,6 @@ chmod 755 /run/sshd
 # Передаем управление оригинальному скрипту entrypoint образа scottyhardy
 # (В оригинальном образе entrypoint обычно /usr/bin/entrypoint)
 exec /usr/bin/entrypoint "$@"
-
 
 
 

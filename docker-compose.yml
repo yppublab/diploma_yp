@@ -89,7 +89,7 @@ services:
       - ./srv_ansible/ansible.cfg:/etc/ansible/ansible.cfg
       - ./srv_ansible/logs:/var/log/ansible
       - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf
-      - wazuh_srv_ansible:/var/ossec/etc
+      - wazuh_srv_ansible:/var/ossec/etc  
       - ./srv_ansible/wazuh/client.keys:/var/ossec/etc/client.keys
     <<: *common_env_file
     environment:
@@ -97,8 +97,8 @@ services:
       SG_ADMINS: ${SG_ANSIBLE_ADMINS}
       GATEWAY_IP: ${SUBNET_ADMIN}.${IP_FW}
       ANSIBLE: /workspace/ansible
-      ANSIBLE_USERNAME: localadmin
-      ANSIBLE_PASSWORD: ${LOCALADMIN_PASSWORD}
+      #ANSIBLE_USERNAME: localadmin
+      #ANSIBLE_PASSWORD: ${LOCALADMIN_PASSWORD}
     networks:
       admin_net:
         ipv4_address: ${SUBNET_ADMIN}.${IP_SRV_ANSIBLE}
@@ -301,8 +301,6 @@ services:
       ARKIME__elasticsearch: http://srv_opensearch:9200    
       SG_ADMINS: ${SG_INFOSEC_ADMINS}
       GATEWAY_IP: ${SUBNET_INFOSEC}.${IP_FW}
-    ports:
-      - "8006:8005" # Веб-интерфейс Arkime
     networks:
       infosec_net:
         ipv4_address: ${SUBNET_INFOSEC}.${IP_SRV_ARKIME}            
@@ -369,7 +367,7 @@ services:
         ipv4_address: ${SUBNET_SERVERS}.${IP_SRV_LDAP}
     restart: always
     healthcheck:
-      test: ["CMD", "bash", "-c", "ldapsearch -x -H ldap://127.0.0.1 -D cn=admin,dc=local,dc=host -w ${LDAP_ADMIN_PASSWORD} -b local.host >/dev/null 2>&1"]
+      test: ["CMD", "bash", "-c", "ldapsearch -x -H ldap://127.0.0.1 -D \"cn=admin,dc=local,dc=host\" -w \"$${LDAP_ADMIN_PASSWORD}\" -b \"dc=local,dc=host\" >/dev/null 2>&1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -382,8 +380,7 @@ services:
     container_name: srv_ldap_mgr
     cap_add: [ "NET_ADMIN" ]
     restart: always    
-    depends_on:
-      - srv_ldap
+    depends_on: [ srv_ldap ]
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -591,7 +588,7 @@ services:
       <<: *common_env
       INDEXER_USERNAME: admin
       INDEXER_PASSWORD: SecretPassword
-      WAZUH_API_URL: https://${SUBNET_INFOSEC}.${IP_SRV_WAZUH_MANAGER}
+      WAZUH_API_URL: https://${SUBNET_INFOSEC}.${IP_SRV_WAZUH_MANAGER}:55000
       DASHBOARD_USERNAME: kibanaserver
       DASHBOARD_PASSWORD: kibanaserver
       API_USERNAME: wazuh-wui
@@ -612,7 +609,7 @@ services:
       infosec_net:
         ipv4_address: ${SUBNET_INFOSEC}.${IP_SRV_WAZUH_DASHBOARD}
         aliases:
-          - wazuh.manager
+          - wazuh.dashboard
     dns:
       - ${SUBNET_SERVERS}.${IP_SRV_DNS}  
 
@@ -621,6 +618,8 @@ services:
     container_name: srv_wiki
     hostname: srv_wiki
     cap_add: [ "NET_ADMIN" ]   
+    cpus: 0.3
+    mem_limit: 512mb
     restart: no
     <<: *common_env_file
     environment:
@@ -1122,19 +1121,28 @@ services:
       - ${SUBNET_SERVERS}.${IP_SRV_DNS}
 
   srv_roundcube:
-    image: roundcube/roundcubemail:latest
+    hostname: srv_roundcube
+    build: ./srv_roundcube
     container_name: srv_roundcube
-    ports:
-      - "${RC_PORT_INTERNAL}:80"
+    cap_add: [ "NET_ADMIN" ]
+    restart: always
+    volumes:
+      - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf          
+    <<: *common_env_file
     environment:
-      - ROUNDCUBEMAIL_DB_TYPE=sqlite
-      - ROUNDCUBEMAIL_DEFAULT_HOST=srv_mail
-      - ROUNDCUBEMAIL_SMTP_SERVER=srv_mail
+      <<: *common_env
+      SG_ADMINS: ${SG_SRV_ADMINS}
+      GATEWAY_IP: ${SUBNET_SERVERS}.${IP_FW}
+      ROUNDCUBEMAIL_DB_TYPE: sqlite
+      ROUNDCUBEMAIL_DEFAULT_HOST: srv_mail
+      ROUNDCUBEMAIL_SMTP_SERVER: srv_mail
     networks:
       servers_net:
         ipv4_address: ${SUBNET_SERVERS}.${SRV_RC_IP}
     depends_on:
       - srv_mail
+    dns:
+      - ${SUBNET_SERVERS}.${IP_SRV_DNS}
 
 networks:  
   uplink_net:

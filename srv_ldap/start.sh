@@ -172,13 +172,28 @@ chmod 0440 /etc/sudoers.d/ldap-sudo
 sed -i "s|SG_ADMINS|$SG_ADMINS|g" /etc/sudoers.d/ldap-sudo
 
 # Запуск rsyslog
-/usr/sbin/rsyslogd
+if [ -f /run/rsyslogd.pid ]; then
+  pid="$(cat /run/rsyslogd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx rsyslogd; then
+    rm -f /run/rsyslogd.pid
+  fi
+fi
+
+pgrep -x rsyslogd >/dev/null 2>&1 || /usr/sbin/rsyslogd -iNONE
+
+
 
 # Run SSH server
 mkdir -p /run/sshd
 chmod 755 /run/sshd
 ssh-keygen -A >/dev/null 2>&1 || true
-/usr/sbin/sshd
+if [ -f /run/sshd.pid ]; then
+  pid="$(cat /run/sshd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sshd; then
+    rm -f /run/sshd.pid /var/run/sshd.pid
+  fi
+fi
+pgrep -x sshd >/dev/null 2>&1 || /usr/sbin/sshd
 
 # WAZUH AGENT START
 /var/ossec/bin/wazuh-control start
@@ -188,14 +203,29 @@ mkdir -p /etc/sssd
 cp /etc/sssd_temp.conf /etc/sssd/sssd.conf
 chmod 600 /etc/sssd/sssd.conf
 mkdir -p /var/lib/sss/db /var/log/sssd
-if [ ! -f /var/run/sssd.pid ]; then
-  /usr/sbin/sssd
-fi 
+if [ -f /run/sssd.pid ]; then
+  pid="$(cat /run/sssd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sssd; then
+    rm -f /run/sssd.pid /var/run/sssd.pid
+  fi
+fi
+pgrep -x sssd >/dev/null 2>&1 || /usr/sbin/sssd
 echo "Testing LDAP connection via SSSD..."
 if getent passwd test >/dev/null 2>&1; then
     echo "LDAP connection OK, NSS cache warmed."
 else
     echo "LDAP user 'test' not found via NSS"
+fi
+
+# Make LDAP_ADMIN_PASSWORD visible for svc_admin_ib login shell sessions.
+if [ -n "${LDAP_ADMIN_PASSWORD:-}" ]; then
+  ldap_admin_password_b64="$(printf '%s' "$LDAP_ADMIN_PASSWORD" | base64 | tr -d '\n')"
+  cat > /etc/profile.d/60-svc_admin_ib-ldap-admin-password.sh <<EOF
+if [ "\${USER:-}" = "svc_admin_ib" ]; then
+  export LDAP_ADMIN_PASSWORD="\$(printf '%s' '${ldap_admin_password_b64}' | base64 -d)"
+fi
+EOF
+  chmod 0644 /etc/profile.d/60-svc_admin_ib-ldap-admin-password.sh
 fi
 
 # Keep container alive

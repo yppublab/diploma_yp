@@ -32,17 +32,19 @@ mkdir -p /etc/sssd
 cp /etc/sssd_temp.conf /etc/sssd/sssd.conf
 chmod 600 /etc/sssd/sssd.conf
 mkdir -p /var/lib/sss/db /var/log/sssd
-/usr/sbin/sssd
+if [ -f /run/sssd.pid ]; then
+  pid="$(cat /run/sssd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sssd; then
+    rm -f /run/sssd.pid /var/run/sssd.pid
+  fi
+fi
+pgrep -x sssd >/dev/null 2>&1 || /usr/sbin/sssd
 echo "Testing LDAP connection via SSSD..."
-while true; do
-    if getent passwd test >/dev/null 2>&1; then
-        echo "LDAP connection OK, NSS cache warmed."
-        break
-    else
-        echo "LDAP user 'test' not found via NSS"
-    fi
-    sleep 2
-done
+if getent passwd test >/dev/null 2>&1; then
+    echo "LDAP connection OK, NSS cache warmed."
+else
+    echo "LDAP user 'test' not found via NSS"
+fi
 
 # Enforce pam_access for group-based login control
 if ! grep -q '^account required pam_access.so' /etc/pam.d/common-account; then
@@ -81,7 +83,16 @@ chmod 0440 /etc/sudoers.d/ldap-sudo
 sed -i "s|SG_ADMINS|$SG_ADMINS|g" /etc/sudoers.d/ldap-sudo
 
 # Запуск rsyslog
-/usr/sbin/rsyslogd
+if [ -f /run/rsyslogd.pid ]; then
+  pid="$(cat /run/rsyslogd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx rsyslogd; then
+    rm -f /run/rsyslogd.pid
+  fi
+fi
+
+pgrep -x rsyslogd >/dev/null 2>&1 || /usr/sbin/rsyslogd -iNONE
+
+
 
 # SSH
 echo "SSH setup..."
@@ -103,7 +114,13 @@ fi
 sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config || true
 sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config || true
 ssh-keygen -A >/dev/null 2>&1 || true
-/usr/sbin/sshd
+if [ -f /run/sshd.pid ]; then
+  pid="$(cat /run/sshd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sshd; then
+    rm -f /run/sshd.pid /var/run/sshd.pid
+  fi
+fi
+pgrep -x sshd >/dev/null 2>&1 || /usr/sbin/sshd
 
 
 # Schedule pcap_edit.py to run every 7 minutes.
@@ -124,7 +141,6 @@ fi
 # Передаем управление оригинальному скрипту
 echo "Arkime starting..."
 exec /opt/arkime/bin/docker.sh capture-viewer --update-geo "$@"
-
 
 
 

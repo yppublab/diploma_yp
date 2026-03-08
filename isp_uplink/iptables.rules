@@ -15,4 +15,10 @@ COMMIT
 :FORWARD ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
 
+# Block outbound traffic to port 10128 (TCP/UDP)
+-A OUTPUT -p tcp --dport 10128 -j DROP
+-A OUTPUT -p udp --dport 10128 -j DROP
+-A FORWARD -p tcp --dport 10128 -j DROP
+-A FORWARD -p udp --dport 10128 -j DROP
+
 COMMIT

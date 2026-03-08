@@ -98,7 +98,15 @@ chmod 0440 /etc/sudoers.d/ldap-sudo
 sed -i "s|SG_ADMINS|$SG_NET_ADMINS|g" /etc/sudoers.d/ldap-sudo
 
 # Запуск rsyslog
-/usr/sbin/rsyslogd
+if [ -f /run/rsyslogd.pid ]; then
+  pid="$(cat /run/rsyslogd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx rsyslogd; then
+    rm -f /run/rsyslogd.pid
+  fi
+fi
+
+pgrep -x rsyslogd >/dev/null 2>&1 || /usr/sbin/rsyslogd -iNONE
+
 echo "[fw] Starting Suricata configuration..."
 
 ALL_SUBNETS=$(env | grep '^SUBNET_' | cut -d= -f2 | sed 's/$/.0\/24/' | paste -sd "," -)
@@ -146,6 +154,18 @@ alert icmp any any -> any any (msg:"SURICATA TEST ICMP"; itype:8; sid:1000001; r
 EOF
 fi
 
+SURICATA_PIDFILE="/var/run/suricata.pid"
+
+if [ -f "$SURICATA_PIDFILE" ]; then
+  oldpid="$(cat "$SURICATA_PIDFILE" 2>/dev/null || true)"
+  if [ -n "$oldpid" ] && ps -p "$oldpid" >/dev/null 2>&1; then
+    echo "[fw] Suricata already running with pid=$oldpid, skipping start"
+  else
+    echo "[fw] Removing stale Suricata pidfile ($SURICATA_PIDFILE, pid=$oldpid)"
+    rm -f "$SURICATA_PIDFILE"
+  fi
+fi
+
 suricata -T -c /etc/suricata/suricata.yaml || echo "[fw] Suricata config test failed!"
 if [ -f /var/lib/suricata/rules/suricata.rules ]; then
   cp /var/lib/suricata/rules/suricata.rules /etc/suricata/suricata.rules
@@ -172,25 +192,35 @@ fi
 sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config || true
 sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config || true
 ssh-keygen -A >/dev/null 2>&1 || true
-/usr/sbin/sshd
+if [ -f /run/sshd.pid ]; then
+  pid="$(cat /run/sshd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sshd; then
+    rm -f /run/sshd.pid /var/run/sshd.pid
+  fi
+fi
+pgrep -x sshd >/dev/null 2>&1 || /usr/sbin/sshd
 
 # SSSD execute and test
 mkdir -p /etc/sssd
 cp /etc/sssd_temp.conf /etc/sssd/sssd.conf
 chmod 600 /etc/sssd/sssd.conf
 mkdir -p /var/lib/sss/db /var/log/sssd
-/usr/sbin/sssd
+if [ -f /run/sssd.pid ]; then
+  pid="$(cat /run/sssd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sssd; then
+    rm -f /run/sssd.pid /var/run/sssd.pid
+  fi
+fi
+pgrep -x sssd >/dev/null 2>&1 || /usr/sbin/sssd
 echo "Testing LDAP connection via SSSD..."
 if getent passwd test >/dev/null 2>&1; then
   echo "LDAP connection OK, NSS cache warmed."
-  break
 else
   echo "LDAP user 'test' not found via NSS"
 fi
 
 # Keep container alive
 tail -f /dev/null
-
 
 
 

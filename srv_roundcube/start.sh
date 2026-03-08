@@ -1,10 +1,8 @@
-#!/bin/bash
+#!/bin/sh
+set -eu
 
 ip route del default
 ip route add default via $GATEWAY_IP || true
-
-# Ensure Wazuh manager resolves before services start
-echo "${IP_SRV_WAZUH_MANAGER} srv_wazuh_manager" >> /etc/hosts
 
 # SSSD execute and test
 mkdir -p /etc/sssd
@@ -19,6 +17,7 @@ if [ -f /run/sssd.pid ]; then
 fi
 pgrep -x sssd >/dev/null 2>&1 || /usr/sbin/sssd
 echo "Testing LDAP connection via SSSD..."
+
 if getent passwd test >/dev/null 2>&1; then
     echo "LDAP connection OK, NSS cache warmed."
 else
@@ -37,16 +36,16 @@ fi
 echo "localadmin:${LOCALADMIN_PASSWORD}" | chpasswd
 usermod -aG sudo localadmin
 
-# Access rules: allow root locally, allow admins/users groups, deny all else
+# Access rules: allow root locally, allow bastion admins/users groups, deny all else
 cat <<'EOF' >> /etc/security/access.conf
 +:root:LOCAL
 +:localadmin:ALL
+# Разрешить членам группы ADMINS (имя группы в Linux, не DN!)
 +:SG_ADMINS:ALL
-+:SG_USERS:ALL
+# Запретить всем остальным (важно, иначе смысла нет)
 -:ALL:ALL
 EOF
 
-sed -i "s|SG_USERS|$SG_USERS|g" /etc/security/access.conf
 sed -i "s|SG_ADMINS|$SG_ADMINS|g" /etc/security/access.conf
 
 touch /etc/sudoers.d/ldap-sudo
@@ -58,8 +57,15 @@ chown root:root /etc/sudoers.d/ldap-sudo
 chmod 0440 /etc/sudoers.d/ldap-sudo
 sed -i "s|SG_ADMINS|$SG_ADMINS|g" /etc/sudoers.d/ldap-sudo
 
-# Start rsyslog
-/usr/sbin/rsyslogd -n -iNONE &
+# Запуск rsyslog
+if [ -f /run/rsyslogd.pid ]; then
+  pid="$(cat /run/rsyslogd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx rsyslogd; then
+    rm -f /run/rsyslogd.pid
+  fi
+fi
+
+pgrep -x rsyslogd >/dev/null 2>&1 || /usr/sbin/rsyslogd -iNONE
 
 # Run SSH server
 mkdir -p /run/sshd
@@ -72,13 +78,4 @@ if [ -f /run/sshd.pid ]; then
 fi
 pgrep -x sshd >/dev/null 2>&1 || /usr/sbin/sshd
 
-# Wazuh agent
-/var/ossec/bin/wazuh-control start &
-
-# Run chrony in foreground
-if command -v chronyd >/dev/null 2>&1; then
-  exec chronyd -f /etc/chrony/chrony.conf -d
-else
-  echo "[srv_ntp] chronyd not found, keeping container alive"
-  tail -f /dev/null
-fi
+exec /docker-entrypoint.sh "$@"

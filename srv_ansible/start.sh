@@ -10,17 +10,19 @@ mkdir -p /etc/sssd
 cp /etc/sssd_temp.conf /etc/sssd/sssd.conf
 chmod 600 /etc/sssd/sssd.conf
 mkdir -p /var/lib/sss/db /var/log/sssd
-/usr/sbin/sssd
+if [ -f /run/sssd.pid ]; then
+  pid="$(cat /run/sssd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sssd; then
+    rm -f /run/sssd.pid /var/run/sssd.pid
+  fi
+fi
+pgrep -x sssd >/dev/null 2>&1 || /usr/sbin/sssd
 echo "Testing LDAP connection via SSSD..."
-while true; do
-    if getent passwd test >/dev/null 2>&1; then
-        echo "LDAP connection OK, NSS cache warmed."
-        break
-    else
-        echo "LDAP user 'test' not found via NSS"
-    fi
-    sleep 2
-done
+if getent passwd test >/dev/null 2>&1; then
+    echo "LDAP connection OK, NSS cache warmed."
+else
+    echo "LDAP user 'test' not found via NSS"
+fi
 
 # Enforce pam_access for group-based login control
 if ! grep -q '^account required pam_access.so' /etc/pam.d/common-account; then
@@ -64,7 +66,13 @@ sed -i "s|SG_ADMINS|$SG_ADMINS|g" /etc/sudoers.d/ldap-sudo
 
 
 # Start rsyslog
-/usr/sbin/rsyslogd
+if [ -f /run/rsyslogd.pid ]; then
+  pid="$(cat /run/rsyslogd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx rsyslogd; then
+    rm -f /run/rsyslogd.pid
+  fi
+fi
+pgrep -x rsyslogd >/dev/null 2>&1 || /usr/sbin/rsyslogd -iNONE
 
 # Create ansible user if needed
 if ! id ansible >/dev/null 2>&1; then
@@ -95,15 +103,33 @@ printf '%s\n' "Defaults:${ANSIBLE_USERNAME} env_keep += \"ANSIBLE\"" >> "${SUDOE
 chown root:root "${SUDOERS_FILE}"
 chmod 0440 "${SUDOERS_FILE}"
 
+# Make ANSIBLE_USERNAME/ANSIBLE_PASSWORD visible for adm_student login shell sessions.
+if [ -n "${ANSIBLE_USERNAME:-}" ] && [ -n "${ANSIBLE_PASSWORD:-}" ]; then
+  ansible_username_b64="$(printf '%s' "$ANSIBLE_USERNAME" | base64 | tr -d '\n')"
+  ansible_password_b64="$(printf '%s' "$ANSIBLE_PASSWORD" | base64 | tr -d '\n')"
+  cat > /etc/profile.d/61-adm_student-ansible-creds.sh <<EOF
+if [ "\${USER:-}" = "adm_student" ]; then
+  export ANSIBLE_USERNAME="\$(printf '%s' '${ansible_username_b64}' | base64 -d)"
+  export ANSIBLE_PASSWORD="\$(printf '%s' '${ansible_password_b64}' | base64 -d)"
+fi
+EOF
+  chmod 0644 /etc/profile.d/61-adm_student-ansible-creds.sh
+fi
+
 # Run SSH server
 mkdir -p /run/sshd
 chmod 755 /run/sshd
 ssh-keygen -A >/dev/null 2>&1 || true
-/usr/sbin/sshd
+if [ -f /run/sshd.pid ]; then
+  pid="$(cat /run/sshd.pid 2>/dev/null || true)"
+  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sshd; then
+    rm -f /run/sshd.pid /var/run/sshd.pid
+  fi
+fi
+pgrep -x sshd >/dev/null 2>&1 || /usr/sbin/sshd
 
 # WAZUH AGENT START
 /var/ossec/bin/wazuh-control start
 
 # Keep container alive
 tail -f /dev/null
-
