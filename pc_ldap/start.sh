@@ -119,9 +119,9 @@ fi
 # Create local admin account if needed
 if ! id localadmin >/dev/null 2>&1; then
     useradd -m -s /bin/bash localadmin
+    echo "localadmin:${LOCALADMIN_PASSWORD}" | chpasswd
+    usermod -aG sudo localadmin
 fi
-echo "localadmin:${LOCALADMIN_PASSWORD}" | chpasswd
-usermod -aG sudo localadmin
 
 # Access rules: allow root locally, allow bastion admins/users groups, deny all else
 cat <<'EOF' >> /etc/security/access.conf
