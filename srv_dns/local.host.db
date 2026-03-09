@@ -1,7 +1,7 @@
 $ORIGIN local.host.
 $TTL 300
 @   IN SOA ns.local.host. admin.local.host. (
-        2025091003 ; Serial
+        2026030901 ; Serial
         3600       ; Refresh
         900        ; Retry
         604800     ; Expire
@@ -53,6 +53,13 @@ srv_web                 IN A    192.168.204.34
 api                     IN A    192.168.204.34
 srv_web_db              IN A    192.168.204.94
 wazuh                   IN A    192.168.203.90
+srv_mail                IN A    192.168.201.50
+mail                    IN A    192.168.201.50
+smtp                    IN A    192.168.201.50
+imap                    IN A    192.168.201.50
+srv_roundcube           IN A    192.168.201.51
+webmail                 IN A    192.168.201.51
+
 srv_branch_bastion	IN A	10.97.23.66
 srv_branch_dns	        IN A	10.97.23.44
 srv_branch_fs	        IN A	10.97.23.33
