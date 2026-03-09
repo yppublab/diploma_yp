@@ -128,7 +128,8 @@ services:
     build: ./bastion
     hostname: srv_branch_bastion
     container_name: srv_branch_bastion
-    cap_add: [ "NET_ADMIN" ]    
+    cap_add: [ "NET_ADMIN" ]   
+    restart: unless-stopped 
     volumes:
       - ./branch/srv_branch_bastion/home/users:/home/users/
       - ./branch/srv_branch_polarproxy/certs/proxy_ca.crt:/usr/local/share/ca-certificates/proxy_ca.crt:ro
@@ -200,7 +201,8 @@ services:
     build: ./pc_ldap
     hostname: ws_spb_000845
     container_name: ws_spb_000845
-    cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]        
+    cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]     
+    restart: unless-stopped   
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -226,6 +228,7 @@ services:
     hostname: ws_spb_000833
     container_name: ws_spb_000833
     cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]        
+    restart: unless-stopped
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -250,7 +253,8 @@ services:
     build: ./pc_ldap
     hostname: ws_spb_000721
     container_name: ws_spb_000721
-    cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]        
+    cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]
+    restart: unless-stopped     
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -275,7 +279,8 @@ services:
     build: ./pc_ldap
     hostname: ws_spb_000777
     container_name: ws_spb_000777
-    cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]        
+    cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]
+    restart: unless-stopped
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:

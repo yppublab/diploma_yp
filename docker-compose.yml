@@ -1,4 +1,4 @@
-
+﻿
 x-env-file: &common_env_file
   env_file:
     - ./.env
@@ -12,7 +12,7 @@ services:
     build: ./isp_uplink
     container_name: isp
     cap_add: [ "NET_ADMIN" ]
-    restart: always
+    restart: unless-stopped
     networks:
       uplink_net:
         ipv4_address: ${SUBNET_UPLINK}.254
@@ -42,7 +42,7 @@ services:
     build: ./fw
     container_name: fw
     cap_add: [ "NET_ADMIN" ]
-    restart: always
+    restart: unless-stopped
     sysctls:
       net.ipv4.ip_forward: 1    
       net.ipv4.conf.all.src_valid_mark: 1  
@@ -83,7 +83,7 @@ services:
     hostname: srv_ansible
     container_name: srv_ansible
     cap_add: [ "NET_ADMIN" ]
-    restart: always
+    restart: unless-stopped
     volumes:
       - ./srv_ansible/ansible:/workspace/
       - ./srv_ansible/ansible.cfg:/etc/ansible/ansible.cfg
@@ -110,7 +110,7 @@ services:
     build: ./srv_dns
     container_name: srv_dns
     cap_add: [ "NET_ADMIN" ]
-    restart: always
+    restart: unless-stopped
     volumes:
       - ./srv_dns/Corefile:/etc/coredns/Corefile:ro
       - ./srv_dns/local.host.db:/etc/coredns/local.host.db:ro
@@ -132,7 +132,7 @@ services:
     build: ./srv_ntp
     container_name: srv_ntp
     cap_add: [ "NET_ADMIN", "SYS_TIME" ]
-    restart: always
+    restart: unless-stopped
     volumes:
       - ./srv_ntp/chrony.conf:/etc/chrony/chrony.conf:ro
       - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf
@@ -153,7 +153,7 @@ services:
     build: ./srv_wg_portal
     container_name: srv_wg_portal
     hostname: srv_wg_portal
-    restart: always
+    restart: unless-stopped
     cap_add: [ "NET_ADMIN" ]
     volumes:
       - ./srv_wg_portal/data:/app/data
@@ -179,6 +179,7 @@ services:
       - ${SUBNET_SERVERS}.${IP_SRV_DNS}
 
   srv_bastion:
+    restart: unless-stopped
     build: ./bastion
     hostname: srv_bastion
     container_name: srv_bastion
@@ -189,7 +190,7 @@ services:
       - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf      
       - wazuh_srv_bastion:/var/ossec/etc
       - ./srv_bastion/wazuh/client.keys:/var/ossec/etc/client.keys
-    shm_size: "1gb" # Важно для стабильности браузеров и GUI  
+    shm_size: "1gb" # Важно для стабильности браузеров и GUI
     <<: *common_env_file
     environment:
       <<: *common_env 
@@ -203,6 +204,7 @@ services:
       - ${SUBNET_SERVERS}.${IP_SRV_DNS}  
 
   srv_bastion_ib:
+    restart: unless-stopped
     build: ./bastion
     hostname: srv_bastion_ib
     container_name: srv_bastion_ib
@@ -217,7 +219,7 @@ services:
       #- ./srv_bastion_ib/wazuh/var/ossec/queue:/var/ossec/queue
       #- ./srv_bastion_ib/wazuh/etc/filebeat:/etc/filebeat
       #- ./srv_bastion_ib/wazuh/var/lib/filebeat:/var/lib/filebeat      
-    shm_size: "1gb" # Важно для стабильности браузеров и GUI  
+    shm_size: "1gb" # Важно для стабильности браузеров и GUI
     <<: *common_env_file
     environment:
       <<: *common_env 
@@ -263,7 +265,7 @@ services:
     build: ./forward_proxy
     container_name: srv_polarproxy
     hostname: srv_polarproxy
-    restart: always
+    restart: unless-stopped
     cap_add: [ "NET_ADMIN" ]  
     networks:
       dmz_net:
@@ -288,7 +290,7 @@ services:
     container_name: srv_arkime
     hostname: srv_arkime
     cap_add: [ "NET_ADMIN" ]
-    restart: always
+    restart: unless-stopped
     working_dir: /opt/arkime
     volumes:
       - arkime_pcap_storage:/opt/arkime/raw
@@ -312,7 +314,7 @@ services:
     container_name: srv_opensearch
     hostname: srv_opensearch
     cap_add: [ "NET_ADMIN" ]        
-    restart: always
+    restart: unless-stopped
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -365,7 +367,7 @@ services:
     networks:
       servers_net:
         ipv4_address: ${SUBNET_SERVERS}.${IP_SRV_LDAP}
-    restart: always
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "bash", "-c", "ldapsearch -x -H ldap://127.0.0.1 -D \"cn=admin,dc=local,dc=host\" -w \"$${LDAP_ADMIN_PASSWORD}\" -b \"dc=local,dc=host\" >/dev/null 2>&1"]
       interval: 30s
@@ -379,7 +381,7 @@ services:
     hostname: srv_ldap_mgr
     container_name: srv_ldap_mgr
     cap_add: [ "NET_ADMIN" ]
-    restart: always    
+    restart: unless-stopped
     depends_on: [ srv_ldap ]
     <<: *common_env_file
     environment:
@@ -437,7 +439,7 @@ services:
     depends_on:
       srv_espocrm_db:
         condition: service_healthy
-    restart: always
+    restart: unless-stopped
     dns:
       - ${SUBNET_SERVERS}.${IP_SRV_DNS}
 
@@ -469,7 +471,7 @@ services:
           - espocrm-db
     ports:
       - 3306:3306
-    restart: always
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 20s
@@ -483,7 +485,7 @@ services:
     build: ./srv_wazuh_manager
     hostname: srv_wazuh_manager
     container_name: srv_wazuh_manager
-    restart: always
+    restart: unless-stopped
     cap_add: [ "NET_ADMIN" ]        
     deploy:
       resources:
@@ -543,7 +545,7 @@ services:
     build: ./srv_wazuh_indexer
     hostname: srv_wazuh_indexer
     container_name: srv_wazuh_indexer
-    restart: always
+    restart: unless-stopped
     cap_add: [ "NET_ADMIN" ]
     ports:
       - "9200:9200"
@@ -581,7 +583,7 @@ services:
     build: ./srv_wazuh_dashboard
     hostname: srv_wazuh_dashboard
     container_name: srv_wazuh_dashboard
-    restart: always
+    restart: unless-stopped
     cap_add: [ "NET_ADMIN" ]      
     <<: *common_env_file
     environment:
@@ -620,7 +622,7 @@ services:
     cap_add: [ "NET_ADMIN" ]   
     cpus: 0.3
     mem_limit: 512mb
-    restart: no
+    restart: unless-stopped
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -640,6 +642,7 @@ services:
       - ${SUBNET_SERVERS}.${IP_SRV_DNS}
 
   srv_web:
+    restart: unless-stopped
     build: ./srv_web
     hostname: srv_web
     container_name: srv_web
@@ -664,6 +667,7 @@ services:
       - ${SUBNET_SERVERS}.${IP_SRV_DNS}  
 
   srv_web_db:
+    restart: unless-stopped
     image: mariadb:latest
     hostname: srv_web_db
     container_name: srv_web_db
@@ -685,6 +689,7 @@ services:
       - ${SUBNET_SERVERS}.${IP_SRV_DNS}  
 
   srv_bim:
+    restart: unless-stopped
     build: ./srv_bim
     hostname: srv_bim
     container_name: srv_bim
@@ -700,6 +705,7 @@ services:
     hostname: ws_msk_000242
     container_name: ws_msk_000242
     cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]
+    restart: unless-stopped
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -720,7 +726,7 @@ services:
       - ./srv_polarproxy/certs/proxy_ca.crt:/usr/local/share/ca-certificates/proxy_ca.crt:ro
       - wazuh_ws000242:/var/ossec/etc
       - ./ws_msk_000242/wazuh/client.keys:/var/ossec/etc/client.keys
-    shm_size: "1gb" # Важно для стабильности браузеров и GUI dd    
+    shm_size: "1gb" # Важно для стабильности браузеров и GUI
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -738,6 +744,7 @@ services:
     hostname: ws_msk_000189
     container_name: ws_msk_000189
     cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]
+    restart: unless-stopped
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -758,7 +765,7 @@ services:
       - wazuh_ws000189:/var/ossec/etc
       - ./ws_msk_000189/wazuh/client.keys:/var/ossec/etc/client.keys
       - ./pc_ldap/web.py:/opt/web.py
-    shm_size: "1gb" # Важно для стабильности браузеров и GUI dd  
+    shm_size: "1gb" # Важно для стабильности браузеров и GUI
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -776,6 +783,7 @@ services:
     hostname: ws_msk_000159
     container_name: ws_msk_000159
     cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]
+    restart: unless-stopped
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -796,7 +804,7 @@ services:
       - wazuh_ws000159:/var/ossec/etc
       - ./ws_msk_000159/wazuh/client.keys:/var/ossec/etc/client.keys
       - ./pc_ldap/web.py:/opt/web.py      
-    shm_size: "1gb" # Важно для стабильности браузеров и GUI dd  
+    shm_size: "1gb" # Важно для стабильности браузеров и GUI
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -814,6 +822,7 @@ services:
     hostname: ws_msk_000021
     container_name: ws_msk_000021
     cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]
+    restart: unless-stopped
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -823,7 +832,7 @@ services:
       - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf      
       - ./srv_polarproxy/certs/proxy_ca.crt:/usr/local/share/ca-certificates/proxy_ca.crt:ro      
       - ./pc_ldap/web.py:/opt/web.py      
-    shm_size: "1gb" # Важно для стабильности браузеров и GUI dd    
+    shm_size: "1gb" # Важно для стабильности браузеров и GUI
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -841,6 +850,7 @@ services:
     hostname: ws_msk_000023
     container_name: ws_msk_000023
     cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]
+    restart: unless-stopped
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -861,7 +871,7 @@ services:
       - wazuh_ws000023:/var/ossec/etc
       - ./ws_msk_000023/wazuh/client.keys:/var/ossec/etc/client.keys
       - ./pc_ldap/web.py:/opt/web.py      
-    shm_size: "1gb" # Важно для стабильности браузеров и GUI dd  
+    shm_size: "1gb" # Важно для стабильности браузеров и GUI
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -879,6 +889,7 @@ services:
     hostname: ws_msk_000034
     container_name: ws_msk_000034
     cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]
+    restart: unless-stopped
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -899,7 +910,7 @@ services:
       - wazuh_ws000034:/var/ossec/etc
       - ./ws_msk_000034/wazuh/client.keys:/var/ossec/etc/client.keys
       - ./pc_ldap/web.py:/opt/web.py      
-    shm_size: "1gb" # Важно для стабильности браузеров и GUI dd  
+    shm_size: "1gb" # Важно для стабильности браузеров и GUI
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -917,6 +928,7 @@ services:
     hostname: ws_msk_000046
     container_name: ws_msk_000046
     cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]
+    restart: unless-stopped
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -937,7 +949,7 @@ services:
       - wazuh_ws000046:/var/ossec/etc
       - ./ws_msk_000046/wazuh/client.keys:/var/ossec/etc/client.keys
       - ./pc_ldap/web.py:/opt/web.py      
-    shm_size: "1gb" # Важно для стабильности браузеров и GUI dd  
+    shm_size: "1gb" # Важно для стабильности браузеров и GUI
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -955,6 +967,7 @@ services:
     hostname: ws_msk_000055
     container_name: ws_msk_000055
     cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]
+    restart: unless-stopped
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -975,7 +988,7 @@ services:
       - wazuh_ws000055:/var/ossec/etc
       - ./ws_msk_000055/wazuh/client.keys:/var/ossec/etc/client.keys
       - ./pc_ldap/web.py:/opt/web.py      
-    shm_size: "1gb" # Важно для стабильности браузеров и GUI dd  
+    shm_size: "1gb" # Важно для стабильности браузеров и GUI
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -993,6 +1006,7 @@ services:
     hostname: ws_msk_000019
     container_name: ws_msk_000019
     cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]
+    restart: unless-stopped
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -1013,7 +1027,7 @@ services:
       - wazuh_ws000019:/var/ossec/etc
       - ./ws_msk_000019/wazuh/client.keys:/var/ossec/etc/client.keys
       - ./pc_ldap/web.py:/opt/web.py      
-    shm_size: "1gb" # Важно для стабильности браузеров и GUI dd  
+    shm_size: "1gb" # Важно для стабильности браузеров и GUI
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -1031,6 +1045,7 @@ services:
     hostname: ws_msk_000126
     container_name: ws_msk_000126
     cap_add: [ "NET_ADMIN", "SYS_ADMIN" ]
+    restart: unless-stopped
     devices:
       - /dev/fuse:/dev/fuse
     security_opt:
@@ -1051,7 +1066,7 @@ services:
       - wazuh_ws000126:/var/ossec/etc
       - ./ws_msk_000126/wazuh/client.keys:/var/ossec/etc/client.keys
       - ./pc_ldap/web.py:/opt/web.py      
-    shm_size: "1gb" # Важно для стабильности браузеров и GUI dd  
+    shm_size: "1gb" # Важно для стабильности браузеров и GUI
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -1086,6 +1101,7 @@ services:
       '
 
   srv_mail:
+    restart: unless-stopped
     image: mailserver/docker-mailserver:latest
     container_name: srv_mail
     hostname: mail.local.host
@@ -1125,7 +1141,7 @@ services:
     build: ./srv_roundcube
     container_name: srv_roundcube
     cap_add: [ "NET_ADMIN" ]
-    restart: always
+    restart: unless-stopped
     volumes:
       - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf          
     <<: *common_env_file
