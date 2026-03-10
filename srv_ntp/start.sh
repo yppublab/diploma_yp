@@ -80,9 +80,4 @@ if [ -f /run/chrony/chronyd.pid ]; then
 fi
 
 # Run chrony in foreground
-if command -v chronyd >/dev/null 2>&1; then
-  exec chronyd -f /etc/chrony/chrony.conf -d
-else
-  echo "[srv_ntp] chronyd not found, keeping container alive"
-  tail -f /dev/null
-fi
+exec chronyd -f /etc/chrony/chrony.conf -d
