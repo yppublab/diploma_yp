@@ -187,7 +187,7 @@ services:
     volumes:
       - ./srv_bastion/home/users:/home/users/
       - ./srv_polarproxy/certs/proxy_ca.crt:/usr/local/share/ca-certificates/proxy_ca.crt:ro
-      - ./wazuh/config/wazuh_indexer_ssl_certs/wazuh.dashboard.pem:/usr/local/share/ca-certificates/wazuh.dashboard.pem:ro
+      - ./wazuh/config/wazuh_indexer_ssl_certs/root-ca.pem:/usr/local/share/ca-certificates/wazuh_root_ca.crt:ro
       - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf      
       - wazuh_srv_bastion:/var/ossec/etc
       - ./srv_bastion/wazuh/client.keys:/var/ossec/etc/client.keys
@@ -213,7 +213,7 @@ services:
     volumes:
       - ./srv_bastion_ib/home/users:/home/users/
       - ./srv_polarproxy/certs/proxy_ca.crt:/usr/local/share/ca-certificates/proxy_ca.crt:ro
-      - ./wazuh/config/wazuh_indexer_ssl_certs/wazuh.dashboard.pem:/usr/local/share/ca-certificates/wazuh.dashboard.pem:ro
+      - ./wazuh/config/wazuh_indexer_ssl_certs/root-ca.pem:/usr/local/share/ca-certificates/wazuh_root_ca.crt:ro
       - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf      
       - wazuh_srv_bastion_ib:/var/ossec/etc
       - ./srv_bastion_ib/wazuh/client.keys:/var/ossec/etc/client.keys

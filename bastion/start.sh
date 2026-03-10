@@ -6,7 +6,7 @@ ip route add default via $GATEWAY_IP || true
 # Trust mounted certificates and configure Firefox policies
 CERT_FILES=()
 [ -f /usr/local/share/ca-certificates/proxy_ca.crt ] && CERT_FILES+=("/usr/local/share/ca-certificates/proxy_ca.crt")
-[ -f /usr/local/share/ca-certificates/wazuh.dashboard.pem ] && CERT_FILES+=("/usr/local/share/ca-certificates/wazuh.dashboard.pem")
+[ -f /usr/local/share/ca-certificates/wazuh_root_ca.crt ] && CERT_FILES+=("/usr/local/share/ca-certificates/wazuh_root_ca.crt")
 
 if [ "${#CERT_FILES[@]}" -gt 0 ]; then
   update-ca-certificates || true
@@ -129,5 +129,4 @@ pgrep -x sshd >/dev/null 2>&1 || /usr/sbin/sshd
 # Передаем управление оригинальному скрипту entrypoint образа scottyhardy
 # (В оригинальном образе entrypoint обычно /usr/bin/entrypoint)
 exec /usr/bin/entrypoint "$@"
-
 
