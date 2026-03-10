@@ -503,11 +503,6 @@ services:
       nofile:
         soft: 655360
         hard: 655360
-    ports:
-      - "1514:1514"
-      - "1515:1515"
-      - "514:514/udp"
-      - "55000:55000"
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -624,7 +619,7 @@ services:
       srv_wazuh_indexer:
         condition: service_healthy
       srv_wazuh_manager:
-        condition: service_healthy        
+        condition: service_started
     networks:
       infosec_net:
         ipv4_address: ${SUBNET_INFOSEC}.${IP_SRV_WAZUH_DASHBOARD}
