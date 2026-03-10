@@ -187,6 +187,7 @@ services:
     volumes:
       - ./srv_bastion/home/users:/home/users/
       - ./srv_polarproxy/certs/proxy_ca.crt:/usr/local/share/ca-certificates/proxy_ca.crt:ro
+      - ./wazuh/config/wazuh_indexer_ssl_certs/wazuh.dashboard.pem:/usr/local/share/ca-certificates/wazuh.dashboard.pem:ro
       - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf      
       - wazuh_srv_bastion:/var/ossec/etc
       - ./srv_bastion/wazuh/client.keys:/var/ossec/etc/client.keys
@@ -212,6 +213,7 @@ services:
     volumes:
       - ./srv_bastion_ib/home/users:/home/users/
       - ./srv_polarproxy/certs/proxy_ca.crt:/usr/local/share/ca-certificates/proxy_ca.crt:ro
+      - ./wazuh/config/wazuh_indexer_ssl_certs/wazuh.dashboard.pem:/usr/local/share/ca-certificates/wazuh.dashboard.pem:ro
       - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf      
       - wazuh_srv_bastion_ib:/var/ossec/etc
       - ./srv_bastion_ib/wazuh/client.keys:/var/ossec/etc/client.keys
@@ -486,7 +488,10 @@ services:
     hostname: srv_wazuh_manager
     container_name: srv_wazuh_manager
     restart: unless-stopped
-    cap_add: [ "NET_ADMIN" ]        
+    cap_add: [ "NET_ADMIN" ]      
+    depends_on:
+      srv_wazuh_indexer:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -562,6 +567,16 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --silent --fail --cacert /usr/share/wazuh-indexer/config/certs/root-ca.pem -u \"$${WAZUH_INDEXER_USERNAME}:$${WAZUH_INDEXER_PASSWORD}\" https://wazuh.indexer:9200/_cluster/health | grep -Eq '\"status\"[[:space:]]*:[[:space:]]*\"(green|yellow)\"'",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     volumes:
       - wazuh_indexer:/var/lib/wazuh-indexer
       - ./wazuh/config/wazuh_indexer_ssl_certs/root-ca.pem:/usr/share/wazuh-indexer/config/certs/root-ca.pem
@@ -584,7 +599,7 @@ services:
     hostname: srv_wazuh_dashboard
     container_name: srv_wazuh_dashboard
     restart: unless-stopped
-    cap_add: [ "NET_ADMIN" ]      
+    cap_add: [ "NET_ADMIN" ]
     <<: *common_env_file
     environment:
       <<: *common_env
@@ -606,7 +621,10 @@ services:
       - ./srv_wazuh_dashboard/config:/usr/share/wazuh-dashboard/data/wazuh/config
       - ./srv_wazuh_dashboard/custom:/usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom
     depends_on:
-      - srv_wazuh_indexer
+      srv_wazuh_indexer:
+        condition: service_healthy
+      srv_wazuh_manager:
+        condition: service_healthy        
     networks:
       infosec_net:
         ipv4_address: ${SUBNET_INFOSEC}.${IP_SRV_WAZUH_DASHBOARD}
@@ -696,6 +714,66 @@ services:
     networks:
       users_net:
         ipv4_address: ${SUBNET_USERS}.${IP_SRV_BIM}        
+    dns:
+      - ${SUBNET_SERVERS}.${IP_SRV_DNS}
+
+  srv_mail:
+    restart: unless-stopped
+    image: mailserver/docker-mailserver:latest
+    container_name: srv_mail
+    hostname: mail.local.host
+    cap_add: [ "NET_ADMIN" ]
+    extra_hosts:
+      - "mail.evil.com:${SUBNET_UPLINK}.${EXT_MAIL_IP}"
+      - "evil.com:${SUBNET_UPLINK}.${EXT_MAIL_IP}"
+    healthcheck:
+      test: >
+        sh -c "
+        postconf -e 'smtpd_sender_restrictions = permit' &&
+        postconf -e 'smtpd_helo_restrictions = permit' &&
+        postfix reload && ip route del default; ip route add default via 192.168.201.254" 
+      interval: 10s
+      retries: 1
+    environment:
+      - TLS_LEVEL=plaintext
+      - ENABLE_SPAMASSASSIN=0
+      - ENABLE_CLAMAV=0
+      - ONE_DIR=1
+      - GATEWAY_IP=${SUBNET_SERVERS}.254
+      - SPOOF_PROTECTION=0
+      - ENABLE_SPF=0
+      - POSTFIX_smtpd_sender_restrictions=permit_mynetworks,permit_sasl_authenticated
+    volumes:
+      - ./mail/internal/postfix-accounts.cf:/tmp/docker-mailserver/postfix-accounts.cf
+      - ./mail/internal/data:/var/mail
+      - ./mail/internal/state:/var/mail-state
+    networks:
+      servers_net:
+        ipv4_address: ${SUBNET_SERVERS}.${SRV_MAIL_IP}
+    dns:
+      - ${SUBNET_SERVERS}.${IP_SRV_DNS}
+
+  srv_roundcube:
+    hostname: srv_roundcube
+    build: ./srv_roundcube
+    container_name: srv_roundcube
+    cap_add: [ "NET_ADMIN" ]
+    restart: unless-stopped
+    volumes:
+      - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf          
+    <<: *common_env_file
+    environment:
+      <<: *common_env
+      SG_ADMINS: ${SG_SRV_ADMINS}
+      GATEWAY_IP: ${SUBNET_SERVERS}.${IP_FW}
+      ROUNDCUBEMAIL_DB_TYPE: sqlite
+      ROUNDCUBEMAIL_DEFAULT_HOST: srv_mail
+      ROUNDCUBEMAIL_SMTP_SERVER: srv_mail
+    networks:
+      servers_net:
+        ipv4_address: ${SUBNET_SERVERS}.${SRV_RC_IP}
+    depends_on:
+      - srv_mail
     dns:
       - ${SUBNET_SERVERS}.${IP_SRV_DNS}
 
@@ -1100,65 +1178,33 @@ services:
       iptables -t nat -D POSTROUTING -s $SUBNET_UPLINK.0/24 -j MASQUERADE
       '
 
-  srv_mail:
+  wazuh_retention:
+    image: curlimages/curl:8.12.1
+    hostname: wazuh_retention
+    container_name: wazuh_retention
     restart: unless-stopped
-    image: mailserver/docker-mailserver:latest
-    container_name: srv_mail
-    hostname: mail.local.host
-    cap_add: [ "NET_ADMIN" ]
-    extra_hosts:
-      - "mail.evil.com:${SUBNET_UPLINK}.${EXT_MAIL_IP}"
-      - "evil.com:${SUBNET_UPLINK}.${EXT_MAIL_IP}"
-    healthcheck:
-      test: >
-        sh -c "
-        postconf -e 'smtpd_sender_restrictions = permit' &&
-        postconf -e 'smtpd_helo_restrictions = permit' &&
-        postfix reload && ip route del default; ip route add default via 192.168.201.254" 
-      interval: 10s
-      retries: 1
-    environment:
-      - TLS_LEVEL=plaintext
-      - ENABLE_SPAMASSASSIN=0
-      - ENABLE_CLAMAV=0
-      - ONE_DIR=1
-      - GATEWAY_IP=${SUBNET_SERVERS}.254
-      - SPOOF_PROTECTION=0
-      - ENABLE_SPF=0
-      - POSTFIX_smtpd_sender_restrictions=permit_mynetworks,permit_sasl_authenticated
-    volumes:
-      - ./mail/internal/postfix-accounts.cf:/tmp/docker-mailserver/postfix-accounts.cf
-      - ./mail/internal/data:/var/mail
-      - ./mail/internal/state:/var/mail-state
-    networks:
-      servers_net:
-        ipv4_address: ${SUBNET_SERVERS}.${SRV_MAIL_IP}
-    dns:
-      - ${SUBNET_SERVERS}.${IP_SRV_DNS}
-
-  srv_roundcube:
-    hostname: srv_roundcube
-    build: ./srv_roundcube
-    container_name: srv_roundcube
-    cap_add: [ "NET_ADMIN" ]
-    restart: unless-stopped
-    volumes:
-      - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf          
+    depends_on:
+      srv_wazuh_indexer:
+        condition: service_healthy
     <<: *common_env_file
     environment:
       <<: *common_env
-      SG_ADMINS: ${SG_SRV_ADMINS}
-      GATEWAY_IP: ${SUBNET_SERVERS}.${IP_FW}
-      ROUNDCUBEMAIL_DB_TYPE: sqlite
-      ROUNDCUBEMAIL_DEFAULT_HOST: srv_mail
-      ROUNDCUBEMAIL_SMTP_SERVER: srv_mail
+      INDEXER_URL: https://wazuh.indexer:9200
+      INDEXER_USER: ${WAZUH_INDEXER_USERNAME}
+      INDEXER_PASSWORD: ${WAZUH_INDEXER_PASSWORD}
+      CA_CERT: /certs/root-ca.pem
+      RETENTION_POLICY_ID: wazuh-retention-5d
+      RETENTION_MIN_INDEX_AGE: 5d
+      RETENTION_MIN_INDEX_SIZE: 10mb
+      RETENTION_INDEX_PATTERNS: wazuh*,.ds-wazuh*
+      RETENTION_RECHECK_SECONDS: 1800
+      RETENTION_RUN_ONCE: "false"
+    entrypoint: ["/bin/sh", "/opt/wazuh-retention/reconcile.sh"]
+    volumes:
+      - ./wazuh/retention/reconcile.sh:/opt/wazuh-retention/reconcile.sh:ro
+      - ./wazuh/config/wazuh_indexer_ssl_certs/root-ca.pem:/certs/root-ca.pem:ro
     networks:
-      servers_net:
-        ipv4_address: ${SUBNET_SERVERS}.${SRV_RC_IP}
-    depends_on:
-      - srv_mail
-    dns:
-      - ${SUBNET_SERVERS}.${IP_SRV_DNS}
+      infosec_net:
 
 networks:  
   uplink_net:

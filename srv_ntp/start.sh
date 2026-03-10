@@ -1,4 +1,5 @@
 #!/bin/bash
+echo "[srv_ntp] Starting init-script"
 
 ip route del default
 ip route add default via $GATEWAY_IP || true
@@ -42,11 +43,9 @@ cat <<'EOF' >> /etc/security/access.conf
 +:root:LOCAL
 +:localadmin:ALL
 +:SG_ADMINS:ALL
-+:SG_USERS:ALL
 -:ALL:ALL
 EOF
 
-sed -i "s|SG_USERS|$SG_USERS|g" /etc/security/access.conf
 sed -i "s|SG_ADMINS|$SG_ADMINS|g" /etc/security/access.conf
 
 touch /etc/sudoers.d/ldap-sudo
@@ -74,6 +73,11 @@ pgrep -x sshd >/dev/null 2>&1 || /usr/sbin/sshd
 
 # Wazuh agent
 /var/ossec/bin/wazuh-control start &
+
+# Remove stale chronyd pid file before starting chrony
+if [ -f /run/chrony/chronyd.pid ]; then
+  rm -f /run/chrony/chronyd.pid
+fi
 
 # Run chrony in foreground
 if command -v chronyd >/dev/null 2>&1; then

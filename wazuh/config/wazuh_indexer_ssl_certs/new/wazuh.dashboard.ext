@@ -1,0 +1,9 @@
+basicConstraints=CA:FALSE
+keyUsage=digitalSignature,keyEncipherment
+extendedKeyUsage=serverAuth
+subjectAltName=@alt_names
+
+[alt_names]
+DNS.1=wazuh
+DNS.2=wazuh.dashboard
+DNS.3=srv_wazuh_dashboard

@@ -127,3 +127,5 @@ home/.config
 users/test*
 
 **/ossec/queue/**
+espocrm/log/apache2/access.log
+espocrm/log/apache2/error.log

@@ -3,19 +3,35 @@
 ip route del default
 ip route add default via $GATEWAY_IP || true
 
-# Trust PolarProxy CA if mounted
-if [ -f /usr/local/share/ca-certificates/proxy_ca.crt ]; then
+# Trust mounted certificates and configure Firefox policies
+CERT_FILES=()
+[ -f /usr/local/share/ca-certificates/proxy_ca.crt ] && CERT_FILES+=("/usr/local/share/ca-certificates/proxy_ca.crt")
+[ -f /usr/local/share/ca-certificates/wazuh.dashboard.pem ] && CERT_FILES+=("/usr/local/share/ca-certificates/wazuh.dashboard.pem")
+
+if [ "${#CERT_FILES[@]}" -gt 0 ]; then
   update-ca-certificates || true
-  mkdir -p /etc/firefox/policies
-  cat <<'EOF' > /etc/firefox/policies/policies.json
+
+  cert_json_items=""
+  for cert in "${CERT_FILES[@]}"; do
+    if [ -n "$cert_json_items" ]; then
+      cert_json_items="$cert_json_items, "
+    fi
+    cert_json_items="${cert_json_items}\"${cert}\""
+  done
+
+  for policy_dir in /etc/firefox/policies /etc/firefox-esr/policies; do
+    mkdir -p "$policy_dir"
+    cat > "$policy_dir/policies.json" <<EOF
 {
   "policies": {
     "Certificates": {
-      "Install": ["/usr/local/share/ca-certificates/proxy_ca.crt"]
+      "ImportEnterpriseRoots": true,
+      "Install": [${cert_json_items}]
     }
   }
 }
 EOF
+  done
 fi
 
 # Enforce pam_access for group-based login control
@@ -113,6 +129,5 @@ pgrep -x sshd >/dev/null 2>&1 || /usr/sbin/sshd
 # Передаем управление оригинальному скрипту entrypoint образа scottyhardy
 # (В оригинальном образе entrypoint обычно /usr/bin/entrypoint)
 exec /usr/bin/entrypoint "$@"
-
 
 

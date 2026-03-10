@@ -1,4 +1,8 @@
 ---
+leafwiki_id: v_I37fGvR
+leafwiki_title: Welcome!
+---
+---
 # Добро пожаловать в базу знаний Local Host Development!
 ---
 
