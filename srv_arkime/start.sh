@@ -12,15 +12,15 @@ OPENSEARCH_WAIT_INTERVAL="${OPENSEARCH_WAIT_INTERVAL:-2}"
 
 echo "Waiting for OpenSearch at ${OPENSEARCH_URL}..."
 SECONDS=0
-until curl -sSf "${OPENSEARCH_URL}" >/dev/null 2>&1; do
+until curl -sS "${OPENSEARCH_URL}/_cluster/health" 2>/dev/null | grep -Eq '"status"[[:space:]]*:[[:space:]]*"(yellow|green)"'; do
     if [ "${OPENSEARCH_WAIT_TIMEOUT}" -gt 0 ] && [ "${SECONDS}" -ge "${OPENSEARCH_WAIT_TIMEOUT}" ]; then
-        echo "Timed out waiting for OpenSearch after ${OPENSEARCH_WAIT_TIMEOUT}s"
+        echo "Timed out waiting for OpenSearch healthy cluster state after ${OPENSEARCH_WAIT_TIMEOUT}s"
         exit 1
     fi
     sleep "${OPENSEARCH_WAIT_INTERVAL}"
 done
 
-echo "OpenSearch is reachable, checking Arkime DB..."
+echo "OpenSearch cluster is yellow/green, checking Arkime DB..."
 
 /opt/arkime/db/db.pl "${OPENSEARCH_URL}" init --ifneeded
 if [ -n "${ARKIME_ADMIN_PASSWORD}" ]; then
@@ -141,6 +141,5 @@ fi
 # Передаем управление оригинальному скрипту
 echo "Arkime starting..."
 exec /opt/arkime/bin/docker.sh capture-viewer --update-geo "$@"
-
 
 

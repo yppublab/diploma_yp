@@ -293,6 +293,9 @@ services:
     hostname: srv_arkime
     cap_add: [ "NET_ADMIN" ]
     restart: unless-stopped
+    depends_on:
+      srv_opensearch:
+        condition: service_healthy
     working_dir: /opt/arkime
     volumes:
       - arkime_pcap_storage:/opt/arkime/raw
@@ -333,6 +336,16 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --silent --fail http://127.0.0.1:9200/_cluster/health | grep -Eq '\"status\"[[:space:]]*:[[:space:]]*\"(yellow|green)\"'",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
     volumes:
       - opensearch_data:/usr/share/opensearch/data
       - ./srv_ldap/sssd.conf:/etc/sssd_temp.conf      
