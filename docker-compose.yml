@@ -76,7 +76,7 @@ services:
       VPN_SUBNET: 10.97.0.0/16
       VPN_SRV_IP: ${SUBNET_DMZ}.${IP_VPN}
     dns:
-      - ${SUBNET_DMZ}.${IP_SRV_DNS}     
+      - ${SUBNET_SERVERS}.${IP_SRV_DNS}     
 
   srv_ansible:
     build: ./srv_ansible
@@ -645,10 +645,12 @@ services:
     build: ./srv_wiki
     container_name: srv_wiki
     hostname: srv_wiki
-    cap_add: [ "NET_ADMIN" ]   
+    cap_add: [ "NET_ADMIN" ]
     cpus: 0.3
     mem_limit: 512mb
     restart: unless-stopped
+    # для задержки старта (самый долгий контейнер)
+    depends_on: [ srv_opensearch ]
     <<: *common_env_file
     environment:
       <<: *common_env
