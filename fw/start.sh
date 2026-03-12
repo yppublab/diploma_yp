@@ -155,15 +155,8 @@ EOF
 fi
 
 SURICATA_PIDFILE="/var/run/suricata.pid"
-
 if [ -f "$SURICATA_PIDFILE" ]; then
-  oldpid="$(cat "$SURICATA_PIDFILE" 2>/dev/null || true)"
-  if [ -n "$oldpid" ] && ps -p "$oldpid" >/dev/null 2>&1; then
-    echo "[fw] Suricata already running with pid=$oldpid, skipping start"
-  else
-    echo "[fw] Removing stale Suricata pidfile ($SURICATA_PIDFILE, pid=$oldpid)"
-    rm -f "$SURICATA_PIDFILE"
-  fi
+  rm -f "$SURICATA_PIDFILE"
 fi
 
 suricata -T -c /etc/suricata/suricata.yaml || echo "[fw] Suricata config test failed!"
