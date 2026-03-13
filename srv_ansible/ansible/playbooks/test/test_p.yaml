@@ -1,155 +1,506 @@
 ---
-- name: Compliance Remediation (ИБН 2.2.3–2.2.6)
+- name: Check SSH root login is disabled (ИБН 2.1.2)
   hosts: users
   become: true
   gather_facts: false
 
-  vars:
-    ldap_admin_group: "SG-ADM-T1-SRV-LINUX-ADMINS"
-    ldap_users_group: "SG-PC-USERS"
+  tasks:
+    - name: Check PermitRootLogin and print status
+      ansible.builtin.shell: |
+        val=$(grep -E '^\s*PermitRootLogin\s+' /etc/ssh/sshd_config | tail -n1 | awk '{print $2}')
+        if [ "$val" = "no" ]; then
+          echo "{{ inventory_hostname }}: OK"
+        elif [ -z "$val" ]; then
+          echo "{{ inventory_hostname }}: NOT OK (PermitRootLogin not set)"
+        else
+          echo "{{ inventory_hostname }}: NOT OK (PermitRootLogin $val)"
+        fi
+      register: check_result
+      changed_when: false
+
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ check_result.stdout }}"
+
+- name: Check localadmin exists and in sudo group (ИБН 2.1.3)
+  hosts: users
+  become: true
+  gather_facts: false
 
   tasks:
+    - name: Check localadmin user and sudo membership
+      ansible.builtin.shell: |
+        if id localadmin >/dev/null 2>&1; then
+          if id -nG localadmin | tr ' ' '\n' | grep -qx sudo; then
+            echo "{{ inventory_hostname }}: OK"
+          else
+            echo "{{ inventory_hostname }}: NOT OK (localadmin exists but not in sudo)"
+          fi
+        else
+          echo "{{ inventory_hostname }}: NOT OK (localadmin does not exist)"
+        fi
+      register: check_result
+      changed_when: false
 
-  #####################################################################
-  # 2.2.3 PASSWORD POLICY
-  #####################################################################
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ check_result.stdout }}"
 
-    - name: Ensure pwquality parameters
-      ansible.builtin.lineinfile:
-        path: /etc/security/pwquality.conf
-        regexp: "{{ item.regexp }}"
-        line: "{{ item.line }}"
-        create: true
-        unsafe_writes: true
-      loop:
-        - { regexp: '^\s*minlen\s*=', line: 'minlen = 8' }
-        - { regexp: '^\s*minclass\s*=', line: 'minclass = 3' }
-        - { regexp: '^\s*maxrepeat\s*=', line: 'maxrepeat = 3' }
-        - { regexp: '^\s*usercheck\s*=', line: 'usercheck = 1' }
-        - { regexp: '^\s*reject_username\s*=', line: 'reject_username = 1' }
-        - { regexp: '^\s*enforce_for_root\s*$', line: 'enforce_for_root' }
+- name: Check required packages are installed (ИБН 2.2.1)
+  hosts: users
+  become: true
+  gather_facts: false
 
-    - name: Ensure pwhistory parameters
-      ansible.builtin.lineinfile:
-        path: /etc/security/pwhistory.conf
-        regexp: "{{ item.regexp }}"
-        line: "{{ item.line }}"
-        create: true
-        unsafe_writes: true
-      loop:
-        - { regexp: '^\s*remember\s*=', line: 'remember = 3' }
-        - { regexp: '^\s*enforce_for_root\s*$', line: 'enforce_for_root' }
+  tasks:
+    - name: Check required packages and print status
+      ansible.builtin.shell: |
+        missing=""
+        for pkg in libpam-modules libpam-pwquality sssd sssd-tools sssd-ldap libnss-sss libpam-sss ldap-utils; do
+          dpkg -s "$pkg" >/dev/null 2>&1 || missing="$missing $pkg"
+        done
 
-    - name: Ensure login.defs parameters
-      ansible.builtin.lineinfile:
-        path: /etc/login.defs
-        regexp: "{{ item.regexp }}"
-        line: "{{ item.line }}"
-        unsafe_writes: true
-      loop:
-        - { regexp: '^\s*PASS_MAX_DAYS\s+', line: 'PASS_MAX_DAYS   180' }
-        - { regexp: '^\s*PASS_MIN_DAYS\s+', line: 'PASS_MIN_DAYS   0' }
-        - { regexp: '^\s*PASS_WARN_AGE\s+', line: 'PASS_WARN_AGE   7' }
-        - { regexp: '^\s*ENCRYPT_METHOD\s+', line: 'ENCRYPT_METHOD  SHA512' }
+        if [ -z "$missing" ]; then
+          echo "{{ inventory_hostname }}: OK"
+        else
+          echo "{{ inventory_hostname }}: NOT OK (missing:$missing)"
+        fi
+      register: check_result
+      changed_when: false
 
-    - name: Remove old pwquality/pwhistory from PAM
-      ansible.builtin.lineinfile:
-        path: /etc/pam.d/common-password
-        regexp: 'pam_(pwquality|pwhistory)\.so'
-        state: absent
-        unsafe_writes: true
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ check_result.stdout }}"
 
-    - name: Ensure pam_pwquality
-      ansible.builtin.lineinfile:
-        path: /etc/pam.d/common-password
-        insertafter: '^password'
-        line: 'password requisite pam_pwquality.so retry=3'
-        unsafe_writes: true
 
-    - name: Ensure pam_pwhistory right after pwquality
-      ansible.builtin.lineinfile:
-        path: /etc/pam.d/common-password
-        insertafter: 'pam_pwquality\.so'
-        line: 'password required pam_pwhistory.so'
-        unsafe_writes: true
 
-  #####################################################################
-  # 2.2.4 SUDO & SU RESTRICTIONS
-  #####################################################################
+- name: Check LDAP authentication config (ИБН 2.2.2)
+  hosts: users
+  become: true
+  gather_facts: false
 
-    - name: Configure sudoers ldap-sudo
-      ansible.builtin.copy:
-        dest: /etc/sudoers.d/ldap-sudo
-        owner: root
-        group: root
-        mode: "0440"
-        content: |
-          %{{ ldap_admin_group }} ALL=(ALL:ALL) ALL
-          localadmin ALL=(ALL:ALL) ALL
-        validate: "/usr/sbin/visudo -cf %s"
+  tasks:
+    - name: Check nsswitch, sssd, pam configs and print status
+      ansible.builtin.shell: |
+        errors=""
 
-    - name: Remove old pam_wheel
-      ansible.builtin.lineinfile:
-        path: /etc/pam.d/su
-        regexp: 'pam_wheel\.so'
-        state: absent
-        unsafe_writes: true
+        # 1. /etc/nsswitch.conf
+        grep -Eq '^\s*passwd:\s+files\s+sss\s*$' /etc/nsswitch.conf || errors="$errors nsswitch_passwd"
+        grep -Eq '^\s*group:\s+files\s+sss\s*$'  /etc/nsswitch.conf || errors="$errors nsswitch_group"
+        grep -Eq '^\s*shadow:\s+files\s+sss\s*$' /etc/nsswitch.conf || errors="$errors nsswitch_shadow"
 
-    - name: Ensure pam_wheel after pam_rootok
-      ansible.builtin.lineinfile:
-        path: /etc/pam.d/su
-        insertafter: '^auth\s+sufficient\s+pam_rootok\.so'
-        line: 'auth       required   pam_wheel.so use_uid group=sudo'
-        unsafe_writes: true
+        # 2. /etc/sssd/sssd.conf (проверяем ключевые параметры)
+        test -f /etc/sssd/sssd.conf || errors="$errors sssd_conf_missing"
 
-  #####################################################################
-  # 2.2.5 ACCESS CONTROL
-  #####################################################################
+        grep -Eq '^\s*services\s*=\s*nss,\s*pam\s*$' /etc/sssd/sssd.conf || errors="$errors sssd_services"
+        grep -Eq '^\s*domains\s*=\s*LDAP\s*$'       /etc/sssd/sssd.conf || errors="$errors sssd_domains"
 
-    - name: Ensure pam_access enabled
-      ansible.builtin.lineinfile:
-        path: /etc/pam.d/common-account
-        regexp: '^\s*account\s+required\s+pam_access\.so'
-        line: 'account required pam_access.so'
-        insertafter: EOF
-        unsafe_writes: true
+        grep -Eq '^\s*id_provider\s*=\s*ldap\s*$'    /etc/sssd/sssd.conf || errors="$errors id_provider"
+        grep -Eq '^\s*auth_provider\s*=\s*ldap\s*$'  /etc/sssd/sssd.conf || errors="$errors auth_provider"
+        grep -Eq '^\s*ldap_uri\s*=\s*ldap://srv_ldap:389\s*$' /etc/sssd/sssd.conf || errors="$errors ldap_uri"
+        grep -Eq '^\s*ldap_search_base\s*=\s*dc=local,dc=host\s*$' /etc/sssd/sssd.conf || errors="$errors ldap_search_base"
 
-    - name: Configure access.conf (managed block)
-      ansible.builtin.blockinfile:
-        path: /etc/security/access.conf
-        create: true
-        marker: "# {mark} ANSIBLE IBN 2.2.5"
-        unsafe_writes: true
-        block: |
-          +:root:LOCAL
-          +:localadmin:ALL
-          +:{{ ldap_admin_group }}:ALL
-          +:{{ ldap_users_group }}:ALL
-          -:ALL:ALL
+        # 3. /etc/pam.d/common-password
+        grep -Eq '^\s*password\s+sufficient\s+pam_sss\.so(\s+use_authtok)?\s*$' /etc/pam.d/common-password || errors="$errors pam_sss_missing"
+        grep -Eq '^\s*password\s+requisite\s+pam_deny\.so\s*$' /etc/pam.d/common-password || errors="$errors pam_deny_missing"
 
-  #####################################################################
-  # 2.2.6 FAILLOCK POLICY
-  #####################################################################
+        if [ -z "$errors" ]; then
+          echo "{{ inventory_hostname }}: OK"
+        else
+          echo "{{ inventory_hostname }}: NOT OK ($errors)"
+        fi
+      register: check_result
+      changed_when: false
 
-    - name: Ensure faillock parameters
-      ansible.builtin.lineinfile:
-        path: /etc/security/faillock.conf
-        regexp: "{{ item.regexp }}"
-        line: "{{ item.line }}"
-        create: true
-        unsafe_writes: true
-      loop:
-        - { regexp: '^\s*deny\s*=', line: 'deny = 5' }
-        - { regexp: '^\s*fail_interval\s*=', line: 'fail_interval = 900' }
-        - { regexp: '^\s*unlock_time\s*=', line: 'unlock_time = 900' }
-        - { regexp: '^\s*audit\s*$', line: 'audit' }
-        - { regexp: '^\s*silent\s*$', line: 'silent' }
-        - { regexp: '^\s*dir\s*=', line: 'dir = /var/lib/faillock' }
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ check_result.stdout }}"
 
-    - name: Ensure faillock directory exists
-      ansible.builtin.file:
-        path: /var/lib/faillock
-        state: directory
-        owner: root
-        group: root
-        mode: "0700"
+- name: Check password policy (ИБН 2.2.3)
+  hosts: users
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check pwquality, pwhistory, login.defs and pam config
+      ansible.builtin.shell: |
+        errors=""
+
+        # /etc/security/pwquality.conf
+        grep -Eq '^\s*minlen\s*=\s*8\s*$'          /etc/security/pwquality.conf || errors="$errors pwquality_minlen"
+        grep -Eq '^\s*minclass\s*=\s*3\s*$'        /etc/security/pwquality.conf || errors="$errors pwquality_minclass"
+        grep -Eq '^\s*maxrepeat\s*=\s*3\s*$'       /etc/security/pwquality.conf || errors="$errors pwquality_maxrepeat"
+        grep -Eq '^\s*usercheck\s*=\s*1\s*$'       /etc/security/pwquality.conf || errors="$errors pwquality_usercheck"
+        grep -Eq '^\s*reject_username\s*=\s*1\s*$' /etc/security/pwquality.conf || errors="$errors pwquality_reject_username"
+        grep -Eq '^\s*enforce_for_root\s*$'        /etc/security/pwquality.conf || errors="$errors pwquality_enforce_for_root"
+
+        # /etc/security/pwhistory.conf
+        grep -Eq '^\s*remember\s*=\s*3\s*$'        /etc/security/pwhistory.conf || errors="$errors pwhistory_remember"
+        grep -Eq '^\s*enforce_for_root\s*$'        /etc/security/pwhistory.conf || errors="$errors pwhistory_enforce_for_root"
+
+        # /etc/login.defs
+        grep -Eq '^\s*PASS_MAX_DAYS\s+180\s*$'     /etc/login.defs || errors="$errors login_PASS_MAX_DAYS"
+        grep -Eq '^\s*PASS_MIN_DAYS\s+0\s*$'       /etc/login.defs || errors="$errors login_PASS_MIN_DAYS"
+        grep -Eq '^\s*PASS_WARN_AGE\s+7\s*$'       /etc/login.defs || errors="$errors login_PASS_WARN_AGE"
+        grep -Eq '^\s*ENCRYPT_METHOD\s+SHA512\s*$' /etc/login.defs || errors="$errors login_ENCRYPT_METHOD"
+
+        # /etc/pam.d/common-password (pam_pwhistory сразу после pam_pwquality)
+        pwq_line=$(grep -nE 'pam_pwquality\.so' /etc/pam.d/common-password | head -n1 | cut -d: -f1)
+        pwh_line=$(grep -nE 'pam_pwhistory\.so' /etc/pam.d/common-password | head -n1 | cut -d: -f1)
+
+        if [ -n "$pwq_line" ] && [ -n "$pwh_line" ]; then
+          [ $pwh_line -eq $((pwq_line+1)) ] || errors="$errors pam_pwhistory_position"
+        else
+          errors="$errors pam_pwquality_or_pwhistory_missing"
+        fi
+
+        if [ -z "$errors" ]; then
+          echo "{{ inventory_hostname }}: OK"
+          exit 0
+        else
+          echo "{{ inventory_hostname }}: NOT OK ($errors)"
+          exit 1
+        fi
+      register: check_result
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ check_result.stdout }}"
+
+- name: Check sudo and su restrictions (ИБН 2.2.4)
+  hosts: users
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check sudoers and su config
+      ansible.builtin.shell: |
+        errors=""
+
+        SUDO_FILE="/etc/sudoers.d/ldap-sudo"
+
+        # Проверка существования файла
+        [ -f "$SUDO_FILE" ] || errors="$errors sudoers_file_missing"
+
+        # Проверка прав 0440
+        if [ -f "$SUDO_FILE" ]; then
+          perm=$(stat -c "%a" "$SUDO_FILE")
+          [ "$perm" = "440" ] || errors="$errors sudoers_wrong_perms($perm)"
+        fi
+
+        # Проверка localadmin
+        grep -Eq '^\s*localadmin\s+ALL=\(ALL:ALL\)\s+ALL\s*$' "$SUDO_FILE" || errors="$errors sudo_localadmin_missing"
+
+        # Проверка доменной группы (любая из допустимых)
+        grep -Eq '^\s*%SG-ADM-T2-WKS-LOCALADMINS\s+ALL=\(ALL:ALL\)\s+ALL\s*$|^\s*%SG-ADM-T1-NET-ADMINS\s+ALL=\(ALL:ALL\)\s+ALL\s*$|^\s*%SG-ADM-T1-SRV-ANSIBLE-ADMINS\s+ALL=\(ALL:ALL\)\s+ALL\s*$|^\s*%SG-ADM-T1-SRV-DNS-ADMINS\s+ALL=\(ALL:ALL\)\s+ALL\s*$|^\s*%SG-ADM-T1-SRV-LINUX-ADMINS\s+ALL=\(ALL:ALL\)\s+ALL\s*$|^\s*%SG-ADM-T1-SRV-SAMBA-ADMINS\s+ALL=\(ALL:ALL\)\s+ALL\s*$|^\s*%SG-ADM-T1-INFOSEC-ADMINS\s+ALL=\(ALL:ALL\)\s+ALL\s*$|^\s*%SG-ADM-T0-DIRECTORY-ADMINS\s+ALL=\(ALL:ALL\)\s+ALL\s*$' "$SUDO_FILE" || errors="$errors sudo_ldap_group_missing"
+        # Проверка su (pam_wheel сразу после pam_rootok)
+        rootok_line=$(grep -nE '^\s*auth\s+sufficient\s+pam_rootok\.so' /etc/pam.d/su | head -n1 | cut -d: -f1)
+        wheel_line=$(grep -nE '^\s*auth\s+required\s+pam_wheel\.so\b.*\bgroup=sudo\b' /etc/pam.d/su | head -n1 | cut -d: -f1)
+
+        if [ -n "$rootok_line" ] && [ -n "$wheel_line" ]; then
+          [ "$wheel_line" -eq $((rootok_line+1)) ] || errors="$errors pam_wheel_position"
+        else
+          errors="$errors pam_wheel_missing"
+        fi
+
+        if [ -z "$errors" ]; then
+          echo "{{ inventory_hostname }}: OK"
+          exit 0
+        else
+          echo "{{ inventory_hostname }}: NOT OK ($errors)"
+          exit 1
+        fi
+      register: check_result
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ check_result.stdout }}"
+
+- name: Check access control by groups (ИБН 2.2.5)
+  hosts: users
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check pam_access and access.conf
+      ansible.builtin.shell: |
+        errors=""
+
+        # /etc/pam.d/common-account
+        grep -Eq '^\s*account\s+required\s+pam_access\.so' /etc/pam.d/common-account || errors="$errors pam_access_missing"
+
+        # /etc/security/access.conf
+        grep -Eq '^\s*\+\s*:root:LOCAL\s*$'        /etc/security/access.conf || errors="$errors access_root_local"
+        grep -Eq '^\s*\+\s*:localadmin:ALL\s*$'    /etc/security/access.conf || errors="$errors access_localadmin_all"
+
+        # SG_ADMINS (любая из допустимых групп админов)
+        grep -Eq '^\s*\+\s*:(SG-ADM-T2-WKS-LOCALADMINS|SG-ADM-T1-NET-ADMINS|SG-ADM-T1-SRV-ANSIBLE-ADMINS|SG-ADM-T1-SRV-DNS-ADMINS|SG-ADM-T1-SRV-LINUX-ADMINS|SG-ADM-T1-SRV-SAMBA-ADMINS|SG-ADM-T1-SRV-INFOSEC-ADMINS|SG-ADM-T0-DIRECTORY-ADMINS):ALL\s*$' \
+          /etc/security/access.conf || errors="$errors access_sg_admins"
+
+        # SG_USERS (любая из допустимых групп пользователей)
+        grep -Eq '^\s*\+\s*:(SG-PC-USERS|SG-SRV-BASTION-IB-USERS|SG-SRV-BASTION-USERS):ALL\s*$' \
+          /etc/security/access.conf || errors="$errors access_sg_users"
+
+        grep -Eq '^\s*-\s*:ALL:ALL\s*$' /etc/security/access.conf || errors="$errors access_deny_all"
+
+        if [ -z "$errors" ]; then
+          echo "{{ inventory_hostname }}: OK"
+          exit 0
+        else
+          echo "{{ inventory_hostname }}: NOT OK ($errors)"
+          exit 1
+        fi
+      register: check_result
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ check_result.stdout }}"
+
+- name: Check faillock policy (ИБН 2.2.6)
+  hosts: users
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check faillock.conf, dir perms and PAM common-auth
+      ansible.builtin.shell: |
+        errors=""
+
+        # /etc/security/faillock.conf
+        grep -Eq '^\s*deny\s*=\s*5\s*$'              /etc/security/faillock.conf || errors="$errors faillock_deny"
+        grep -Eq '^\s*fail_interval\s*=\s*900\s*$'  /etc/security/faillock.conf || errors="$errors faillock_fail_interval"
+        grep -Eq '^\s*unlock_time\s*=\s*900\s*$'    /etc/security/faillock.conf || errors="$errors faillock_unlock_time"
+        grep -Eq '^\s*audit\s*$'                    /etc/security/faillock.conf || errors="$errors faillock_audit"
+        grep -Eq '^\s*silent\s*$'                   /etc/security/faillock.conf || errors="$errors faillock_silent"
+        grep -Eq '^\s*dir\s*=\s*/var/lib/faillock\s*$' /etc/security/faillock.conf || errors="$errors faillock_dir_cfg"
+
+        # /var/lib/faillock perms
+        [ -d /var/lib/faillock ] || errors="$errors faillock_dir_missing"
+        stat -c '%U:%G %a' /var/lib/faillock 2>/dev/null | grep -Eq '^root:root 700$' || errors="$errors faillock_dir_perms"
+
+        # PAM common-auth
+        preauth_line=$(grep -nE 'pam_faillock\.so\s+preauth' /etc/pam.d/common-auth | head -n1 | cut -d: -f1)
+        unix_line=$(grep -nE 'pam_unix\.so'                 /etc/pam.d/common-auth | head -n1 | cut -d: -f1)
+        sss_line=$(grep -nE 'pam_sss\.so'                   /etc/pam.d/common-auth | head -n1 | cut -d: -f1)
+        authfail_line=$(grep -nE 'pam_faillock\.so\s+authfail' /etc/pam.d/common-auth | head -n1 | cut -d: -f1)
+        authsucc_line=$(grep -nE 'pam_faillock\.so\s+authsucc' /etc/pam.d/common-auth | head -n1 | cut -d: -f1)
+        deny_line=$(grep -nE 'pam_deny\.so'                 /etc/pam.d/common-auth | head -n1 | cut -d: -f1)
+        permit_line=$(grep -nE 'pam_permit\.so'             /etc/pam.d/common-auth | head -n1 | cut -d: -f1)
+
+
+        [ -n "$preauth_line" ]   || errors="$errors pam_faillock_preauth_missing"
+        [ -n "$unix_line" ]      || errors="$errors pam_unix_missing"
+        [ -n "$sss_line" ]       || errors="$errors pam_sss_missing"
+        [ -n "$authfail_line" ]  || errors="$errors pam_faillock_authfail_missing"
+        [ -n "$authsucc_line" ]  || errors="$errors pam_faillock_authsucc_missing"
+        [ -n "$deny_line" ]      || errors="$errors pam_deny_missing"
+        [ -n "$permit_line" ]    || errors="$errors pam_permit_missing"
+
+        if [ -n "$preauth_line" ] && [ -n "$unix_line" ] && [ -n "$sss_line" ] && [ -n "$authfail_line" ] && [ -n "$authsucc_line" ] && [ -n "$deny_line" ] && [ -n "$permit_line" ]; then
+          [ "$preauth_line" -lt "$unix_line" ]      || errors="$errors pam_order_preauth"
+          [ "$unix_line" -lt "$sss_line" ]          || errors="$errors pam_order_unix_sss"
+          [ "$sss_line" -lt "$authfail_line" ]      || errors="$errors pam_order_sss_authfail"
+          [ "$authfail_line" -lt "$authsucc_line" ] || errors="$errors pam_order_authfail_authsucc"
+          [ "$authsucc_line" -lt "$deny_line" ]     || errors="$errors pam_order_authsucc_deny"
+          [ "$deny_line" -lt "$permit_line" ]       || errors="$errors pam_order_deny_permit"
+        else
+          errors="$errors pam_stack_incomplete"
+        fi
+
+        if [ -z "$errors" ]; then
+          echo "{{ inventory_hostname }}: OK"
+          exit 0
+        else
+          echo "{{ inventory_hostname }}: NOT OK ($errors)"
+          exit 1
+        fi
+      register: check_result
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ check_result.stdout }}"
+
+- name: Check logging packages (ИБН 2.3.1)
+  hosts: users
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check rsyslog/logrotate packages
+      ansible.builtin.shell: |
+        errors=""
+
+        # rsyslog / rsyslogd (на Ubuntu пакет rsyslog)
+        dpkg -s rsyslog >/dev/null 2>&1 || dpkg -s rsyslogd >/dev/null 2>&1 || errors="$errors rsyslog"
+
+        # logrotate
+        dpkg -s logrotate >/dev/null 2>&1 || errors="$errors logrotate"
+
+        if [ -z "$errors" ]; then
+          echo "{{ inventory_hostname }}: OK"
+          exit 0
+        else
+          echo "{{ inventory_hostname }}: NOT OK ($errors)"
+          exit 1
+        fi
+      register: check_result
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ check_result.stdout }}"
+
+- name: Check rsyslog and ssh logging config (ИБН 2.3.2)
+  hosts: users
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check rsyslog 50-default.conf, log file perms and sshd logging
+      ansible.builtin.shell: |
+        errors=""
+
+        # /etc/rsyslog.d/50-default.conf
+        grep -Eq '^\s*auth,authpriv\.\*\s+/var/log/auth\.log\s*$' /etc/rsyslog.d/50-default.conf || errors="$errors rsyslog_auth_log_rule"
+        grep -Eq '^\s*\*\.\*;auth,authpriv\.none\s+-?/var/log/syslog\s*$' /etc/rsyslog.d/50-default.conf || errors="$errors rsyslog_syslog_rule"
+
+        # perms for log files
+        stat -c '%U:%G %a' /var/log/syslog 2>/dev/null | grep -Eq '^syslog:adm 640$' || errors="$errors syslog_perms"
+        stat -c '%U:%G %a' /var/log/auth.log 2>/dev/null | grep -Eq '^syslog:adm 640$' || errors="$errors authlog_perms"
+
+        # /etc/ssh/sshd_config
+        ssh_facility=$(grep -E '^\s*SyslogFacility\s+' /etc/ssh/sshd_config | tail -n1 | awk '{print toupper($2)}')
+        ssh_loglevel=$(grep -E '^\s*LogLevel\s+' /etc/ssh/sshd_config | tail -n1 | awk '{print toupper($2)}')
+
+        [ "$ssh_facility" = "AUTH" ] || errors="$errors ssh_SyslogFacility_$ssh_facility"
+        [ "$ssh_loglevel" = "INFO" ] || errors="$errors ssh_LogLevel_$ssh_loglevel"
+
+        if [ -z "$errors" ]; then
+          echo "{{ inventory_hostname }}: OK"
+          exit 0
+        else
+          echo "{{ inventory_hostname }}: NOT OK ($errors)"
+          exit 1
+        fi
+      register: check_result
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ check_result.stdout }}"
+
+- name: Check logrotate policy (ИБН 2.3.3)
+  hosts: users
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check /etc/logrotate.conf and /etc/logrotate.d/rsyslog
+      ansible.builtin.shell: |
+        errors=""
+
+        # /etc/logrotate.conf (базовые настройки)
+        grep -Eq '^\s*weekly\s*$'                     /etc/logrotate.conf || errors="$errors lr_weekly"
+        grep -Eq '^\s*su\s+root\s+adm\s*$'            /etc/logrotate.conf || errors="$errors lr_su_root_adm"
+        grep -Eq '^\s*rotate\s+52\s*$'                /etc/logrotate.conf || errors="$errors lr_rotate_52"
+        grep -Eq '^\s*create\s+0640\s+syslog\s+adm\s*$' /etc/logrotate.conf || errors="$errors lr_create_syslog_adm"
+        grep -Eq '^\s*compress\s*$'                   /etc/logrotate.conf || errors="$errors lr_compress"
+        grep -Eq '^\s*delaycompress\s*$'              /etc/logrotate.conf || errors="$errors lr_delaycompress"
+        grep -Eq '^\s*olddir\s+/var/log/archives\s*$' /etc/logrotate.conf || errors="$errors lr_olddir"
+        grep -Eq '^\s*createolddir\s+0750\s+root\s+adm\s*$' /etc/logrotate.conf || errors="$errors lr_createolddir"
+        grep -Eq '^\s*include\s+/etc/logrotate\.d\s*$' /etc/logrotate.conf || errors="$errors lr_include"
+
+        # /etc/logrotate.d/rsyslog — наличие путей
+        grep -Eq '^\s*/var/log/syslog\s*$'    /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_syslog_path"
+        grep -Eq '^\s*/var/log/auth\.log\s*$' /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_authlog_path"
+        grep -Eq '^\s*/var/log/mail\.log\s*$' /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_maillog_path"
+        grep -Eq '^\s*/var/log/kern\.log\s*$' /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_kernlog_path"
+        grep -Eq '^\s*/var/log/user\.log\s*$' /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_userlog_path"
+        grep -Eq '^\s*/var/log/cron\.log\s*$' /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_cronlog_path"
+
+        # /etc/logrotate.d/rsyslog — параметры внутри блока
+        grep -Eq '^\s*rotate\s+52\s*$'         /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_rotate_52"
+        grep -Eq '^\s*weekly\s*$'              /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_weekly"
+        grep -Eq '^\s*missingok\s*$'           /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_missingok"
+        grep -Eq '^\s*notifempty\s*$'           /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_notifempty"
+        grep -Eq '^\s*compress\s*$'            /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_compress"
+        grep -Eq '^\s*delaycompress\s*$'       /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_delaycompress"
+        grep -Eq '^\s*sharedscripts\s*$'       /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_sharedscripts"
+        grep -Eq '^\s*postrotate\s*$'           /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_postrotate"
+        grep -Eq '^\s*/usr/lib/rsyslog/rsyslog-rotate\s*$' /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_postrotate_cmd"
+        grep -Eq '^\s*endscript\s*$'            /etc/logrotate.d/rsyslog || errors="$errors lr_rsyslog_endscript"
+
+        if [ -z "$errors" ]; then
+          echo "{{ inventory_hostname }}: OK"
+          exit 0
+        else
+          echo "{{ inventory_hostname }}: NOT OK ($errors)"
+          exit 1
+        fi
+      register: check_result
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ check_result.stdout }}"
+
+- name: Check antivirus (ClamAV) compliance (СЗИ 3.1.1)
+  hosts: "ws_*:srv_fs"
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check ClamAV full compliance
+      ansible.builtin.shell: |
+        errors=""
+
+        # 1. Packages
+        for pkg in clamav clamav-daemon clamav-freshclam; do
+          dpkg -s "$pkg" >/dev/null 2>&1 || errors="$errors pkg_$pkg"
+        done
+
+        # 2. Services (через process, не systemctl!)
+        pgrep clamd >/dev/null 2>&1 || errors="$errors svc_clamd"
+        pgrep freshclam >/dev/null 2>&1 || errors="$errors svc_freshclam"
+
+        # 3. Database files
+        for db in main.cvd daily.cvd bytecode.cvd; do
+          [ -f "/var/lib/clamav/$db" ] || errors="$errors db_$db"
+        done
+
+        # 4. Log directory
+        [ -d /var/log/clamav ] || errors="$errors logdir"
+
+        # 5. freshclam.conf checks
+        grep -Eq '^\s*Checks\s+([4-9]|[1-9][0-9]+)\s*$' /etc/clamav/freshclam.conf || errors="$errors checks_value"
+        grep -Eq '^\s*DatabaseMirror\s+clamav-mirror\.ru\s*$' /etc/clamav/freshclam.conf || errors="$errors mirror_missing"
+        grep -Eq '^\s*DNSDatabaseInfo\s+no\s*$' /etc/clamav/freshclam.conf || errors="$errors dns_not_disabled"
+
+        if [ -z "$errors" ]; then
+          echo "{{ inventory_hostname }}: OK"
+          exit 0
+        else
+          echo "{{ inventory_hostname }}: NOT OK ($errors)"
+          exit 1
+        fi
+      register: check_result
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Print result
+      ansible.builtin.debug:
+        msg: "{{ check_result.stdout }}"
+
+
+
+
