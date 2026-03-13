@@ -97,18 +97,87 @@ mkdir -p /etc/sssd
 cp /etc/sssd_temp.conf /etc/sssd/sssd.conf
 chmod 600 /etc/sssd/sssd.conf
 mkdir -p /var/lib/sss/db /var/log/sssd
-if [ -f /run/sssd.pid ]; then
-  pid="$(cat /run/sssd.pid 2>/dev/null || true)"
-  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sssd; then
-    rm -f /run/sssd.pid /var/run/sssd.pid
-  fi
-fi
+rm -f /run/sssd.pid /var/run/sssd.pid || true
 pgrep -x sssd >/dev/null 2>&1 || /usr/sbin/sssd
 echo "Testing LDAP connection via SSSD..."
 if getent passwd test >/dev/null 2>&1; then
     echo "LDAP connection OK, NSS cache warmed."
 else
     echo "LDAP user 'test' not found via NSS"
+fi
+
+# Keep one peer expiration date near current time:
+# update to yesterday only when current DB value differs from now by > 1 month.
+DB_FILE="/app/data/sqlite.db"
+TARGET_USER_IDENTIFIER="${WG_PORTAL_EXPIRES_TARGET_USER_IDENTIFIER:-srv_branch_wg_gate}"
+TARGET_INTERFACE_IDENTIFIER="${WG_PORTAL_EXPIRES_TARGET_INTERFACE_IDENTIFIER:-wg0}"
+if [ -f "$DB_FILE" ]; then
+  DB_FILE="$DB_FILE" \
+  TARGET_USER_IDENTIFIER="$TARGET_USER_IDENTIFIER" \
+  TARGET_INTERFACE_IDENTIFIER="$TARGET_INTERFACE_IDENTIFIER" \
+  python3 - <<'PY'
+import os
+import sqlite3
+from datetime import datetime, timedelta, timezone
+
+db_file = os.environ["DB_FILE"]
+target_user = os.environ["TARGET_USER_IDENTIFIER"]
+target_iface = os.environ["TARGET_INTERFACE_IDENTIFIER"]
+
+def parse_db_dt(value: str):
+    if not value:
+        return None
+    raw = value.strip().replace(" ", "T", 1)
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+conn = sqlite3.connect(db_file)
+cur = conn.cursor()
+cur.execute(
+    "SELECT expires_at FROM peers WHERE user_identifier = ? AND interface_identifier = ? LIMIT 1",
+    (target_user, target_iface),
+)
+row = cur.fetchone()
+if row is None:
+    print(f"[srv_wg_portal] Peer not found for user_identifier={target_user}, interface_identifier={target_iface}")
+    conn.close()
+    raise SystemExit(0)
+
+current_raw = row[0]
+current_dt = parse_db_dt(current_raw)
+if current_dt is None:
+    print(f"[srv_wg_portal] Skip expires_at update: cannot parse current value '{current_raw}'")
+    conn.close()
+    raise SystemExit(0)
+
+now_utc = datetime.now(timezone.utc)
+delta_seconds = abs((now_utc - current_dt).total_seconds())
+month_seconds = 31 * 24 * 60 * 60
+if delta_seconds <= month_seconds:
+    print(
+        f"[srv_wg_portal] Skip expires_at update: difference is <= 1 month "
+        f"({delta_seconds/86400:.1f} days)"
+    )
+    conn.close()
+    raise SystemExit(0)
+
+new_dt = (now_utc - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+new_value = new_dt.strftime("%Y-%m-%d %H:%M:%S+00:00")
+cur.execute(
+    "UPDATE peers SET expires_at = ? WHERE user_identifier = ? AND interface_identifier = ?",
+    (new_value, target_user, target_iface),
+)
+conn.commit()
+conn.close()
+print(f"[srv_wg_portal] Updated peers.expires_at to {new_value} for {target_user}/{target_iface}")
+PY
+else
+  echo "[srv_wg_portal] sqlite DB not found: $DB_FILE"
 fi
 
 cd /app || exit 1

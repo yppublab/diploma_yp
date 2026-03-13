@@ -1,3 +1,7 @@
+---
+leafwiki_id: FX8ypPGDg
+leafwiki_title: VPN
+---
 # VPN и WireGuard Portal
 
 Ниже — краткая инструкция, как получить доступ к WireGuard Portal, забрать конфиг и что делать, если что‑то пошло не так.

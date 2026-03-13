@@ -1,4 +1,5 @@
 #!/bin/bash
+echo "[srv_ntp] Starting init-script"
 
 ip route del default
 ip route add default via $GATEWAY_IP || true
@@ -11,12 +12,7 @@ mkdir -p /etc/sssd
 cp /etc/sssd_temp.conf /etc/sssd/sssd.conf
 chmod 600 /etc/sssd/sssd.conf
 mkdir -p /var/lib/sss/db /var/log/sssd
-if [ -f /run/sssd.pid ]; then
-  pid="$(cat /run/sssd.pid 2>/dev/null || true)"
-  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sssd; then
-    rm -f /run/sssd.pid /var/run/sssd.pid
-  fi
-fi
+rm -f /run/sssd.pid /var/run/sssd.pid || true
 pgrep -x sssd >/dev/null 2>&1 || /usr/sbin/sssd
 echo "Testing LDAP connection via SSSD..."
 if getent passwd test >/dev/null 2>&1; then
@@ -42,11 +38,9 @@ cat <<'EOF' >> /etc/security/access.conf
 +:root:LOCAL
 +:localadmin:ALL
 +:SG_ADMINS:ALL
-+:SG_USERS:ALL
 -:ALL:ALL
 EOF
 
-sed -i "s|SG_USERS|$SG_USERS|g" /etc/security/access.conf
 sed -i "s|SG_ADMINS|$SG_ADMINS|g" /etc/security/access.conf
 
 touch /etc/sudoers.d/ldap-sudo
@@ -75,10 +69,10 @@ pgrep -x sshd >/dev/null 2>&1 || /usr/sbin/sshd
 # Wazuh agent
 /var/ossec/bin/wazuh-control start &
 
-# Run chrony in foreground
-if command -v chronyd >/dev/null 2>&1; then
-  exec chronyd -f /etc/chrony/chrony.conf -d
-else
-  echo "[srv_ntp] chronyd not found, keeping container alive"
-  tail -f /dev/null
+# Remove stale chronyd pid file before starting chrony
+if [ -f /run/chrony/chronyd.pid ]; then
+  rm -f /run/chrony/chronyd.pid
 fi
+
+# Run chrony in foreground
+exec chronyd -f /etc/chrony/chrony.conf -d

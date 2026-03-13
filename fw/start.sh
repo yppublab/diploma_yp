@@ -155,15 +155,8 @@ EOF
 fi
 
 SURICATA_PIDFILE="/var/run/suricata.pid"
-
 if [ -f "$SURICATA_PIDFILE" ]; then
-  oldpid="$(cat "$SURICATA_PIDFILE" 2>/dev/null || true)"
-  if [ -n "$oldpid" ] && ps -p "$oldpid" >/dev/null 2>&1; then
-    echo "[fw] Suricata already running with pid=$oldpid, skipping start"
-  else
-    echo "[fw] Removing stale Suricata pidfile ($SURICATA_PIDFILE, pid=$oldpid)"
-    rm -f "$SURICATA_PIDFILE"
-  fi
+  rm -f "$SURICATA_PIDFILE"
 fi
 
 suricata -T -c /etc/suricata/suricata.yaml || echo "[fw] Suricata config test failed!"
@@ -205,12 +198,7 @@ mkdir -p /etc/sssd
 cp /etc/sssd_temp.conf /etc/sssd/sssd.conf
 chmod 600 /etc/sssd/sssd.conf
 mkdir -p /var/lib/sss/db /var/log/sssd
-if [ -f /run/sssd.pid ]; then
-  pid="$(cat /run/sssd.pid 2>/dev/null || true)"
-  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sssd; then
-    rm -f /run/sssd.pid /var/run/sssd.pid
-  fi
-fi
+rm -f /run/sssd.pid /var/run/sssd.pid || true
 pgrep -x sssd >/dev/null 2>&1 || /usr/sbin/sssd
 echo "Testing LDAP connection via SSSD..."
 if getent passwd test >/dev/null 2>&1; then

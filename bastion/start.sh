@@ -3,19 +3,35 @@
 ip route del default
 ip route add default via $GATEWAY_IP || true
 
-# Trust PolarProxy CA if mounted
-if [ -f /usr/local/share/ca-certificates/proxy_ca.crt ]; then
+# Trust mounted certificates and configure Firefox policies
+CERT_FILES=()
+[ -f /usr/local/share/ca-certificates/proxy_ca.crt ] && CERT_FILES+=("/usr/local/share/ca-certificates/proxy_ca.crt")
+[ -f /usr/local/share/ca-certificates/wazuh_root_ca.crt ] && CERT_FILES+=("/usr/local/share/ca-certificates/wazuh_root_ca.crt")
+
+if [ "${#CERT_FILES[@]}" -gt 0 ]; then
   update-ca-certificates || true
-  mkdir -p /etc/firefox/policies
-  cat <<'EOF' > /etc/firefox/policies/policies.json
+
+  cert_json_items=""
+  for cert in "${CERT_FILES[@]}"; do
+    if [ -n "$cert_json_items" ]; then
+      cert_json_items="$cert_json_items, "
+    fi
+    cert_json_items="${cert_json_items}\"${cert}\""
+  done
+
+  for policy_dir in /etc/firefox/policies /etc/firefox-esr/policies; do
+    mkdir -p "$policy_dir"
+    cat > "$policy_dir/policies.json" <<EOF
 {
   "policies": {
     "Certificates": {
-      "Install": ["/usr/local/share/ca-certificates/proxy_ca.crt"]
+      "ImportEnterpriseRoots": true,
+      "Install": [${cert_json_items}]
     }
   }
 }
 EOF
+  done
 fi
 
 # Enforce pam_access for group-based login control
@@ -59,12 +75,7 @@ mkdir -p /etc/sssd
 cp /etc/sssd_temp.conf /etc/sssd/sssd.conf
 chmod 600 /etc/sssd/sssd.conf
 mkdir -p /var/lib/sss/db /var/log/sssd
-if [ -f /run/sssd.pid ]; then
-  pid="$(cat /run/sssd.pid 2>/dev/null || true)"
-  if [ -n "${pid:-}" ] && ! ps -p "$pid" -o comm= 2>/dev/null | grep -qx sssd; then
-    rm -f /run/sssd.pid /var/run/sssd.pid
-  fi
-fi
+rm -f /run/sssd.pid /var/run/sssd.pid || true
 pgrep -x sssd >/dev/null 2>&1 || /usr/sbin/sssd
 echo "Testing LDAP connection via SSSD..."
 if getent passwd test >/dev/null 2>&1; then
@@ -113,6 +124,4 @@ pgrep -x sshd >/dev/null 2>&1 || /usr/sbin/sshd
 # Передаем управление оригинальному скрипту entrypoint образа scottyhardy
 # (В оригинальном образе entrypoint обычно /usr/bin/entrypoint)
 exec /usr/bin/entrypoint "$@"
-
-
 
