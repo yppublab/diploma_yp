@@ -27,6 +27,9 @@
       [ -f /var/lib/clamav/main.cvd ] || errors="$errors db_main"
       [ -f /var/lib/clamav/daily.cvd ] || errors="$errors db_daily"
 
+      # Log directory
+      [ -d /var/log/clamav ] || errors="$errors logdir"
+
       # config compliance
       grep -Eq '^\s*Checks\s+([4-9]|[1-9][0-9]+)\s*$' /etc/clamav/freshclam.conf || errors="$errors checks"
       grep -Eq '^\s*DatabaseMirror\s+clamav-mirror\.ru\s*$' /etc/clamav/freshclam.conf || errors="$errors mirror"
