@@ -57,6 +57,7 @@ RUN groupadd -g 31337 polarproxy && \
     mkdir -p /var/log/PolarProxy /opt/polarproxy && \
     chown polarproxy:polarproxy /var/log/PolarProxy && \
     apt-get update && apt-get install -y curl && curl -s https://www.netresec.com/?download=PolarProxy | tar -xzf - -C /opt/polarproxy
+RUN chmod +x /opt/polarproxy/PolarProxy
 
 COPY start.sh /usr/bin/start.sh
 RUN chmod +x /usr/bin/start.sh
@@ -64,4 +65,3 @@ RUN chmod +x /usr/bin/start.sh
 WORKDIR /opt/polarproxy/
 
 ENTRYPOINT ["/usr/bin/start.sh"]
-
