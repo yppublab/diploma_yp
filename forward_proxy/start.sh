@@ -100,7 +100,6 @@ if [ -f "$CA_P12" ]; then
   CA_ARG="--cacert load:${CA_P12}:${CA_P12_PASSWORD}"
 fi
 
-exec dotnet PolarProxy.dll -v -p "10443, 80, 443" -o "/var/log/PolarProxy/" --leafcert sign --certhttp "10080" $CA_ARG --pcapoveripconnect "$ARKIME_HOST:$ARKIME_PORT" "$@"
-
+exec /opt/polarproxy/PolarProxy -v -p "10443, 80, 443" -o "/var/log/PolarProxy/" --leafcert sign --certhttp "10080" $CA_ARG --pcapoveripconnect "$ARKIME_HOST:$ARKIME_PORT" "$@"
 
 
