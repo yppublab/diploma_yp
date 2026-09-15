@@ -3,7 +3,10 @@ FROM mcr.microsoft.com/dotnet/runtime:6.0
 USER root
 
 ENV DEBIAN_FRONTEND=noninteractive TZ=Europe/Moscow
-RUN apt-get update
+RUN echo "deb http://archive.debian.org/debian bullseye main" > /etc/apt/sources.list && \
+    echo "deb http://archive.debian.org/debian bullseye-updates main" >> /etc/apt/sources.list && \
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid-until && \
+    apt-get update
 
 # Net tools, ssh, base utils
 RUN apt-get install -y --no-install-recommends \
